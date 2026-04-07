@@ -73,14 +73,12 @@ function getAspect(project: (typeof projects)[number]): number {
                           style="aspect-ratio: 5/7"
                         />
                       )}
-                      <div class="item-name-type flex flex-row justify-between w-full">
-                        <div class="absolute z-0 mt-0 w-fit h-full flex flex-col gap-0 project-title">
-                          <h3 class="text-sm leading-[100%] tracking-[-1%]">{project.name}</h3>
-                          <h3 class="text-sm leading-[100%] tracking-[-1%] opacity-0">{project.type}</h3>
+                      <div class="item-name-type flex flex-row justify-between w-full relative overflow-clip">
+                        <div class="absolute z-0 mt-0 ml-0 mr-0 h-full flex flex-col gap-0 project-title">
+                          <h3 class="text-sm leading-[100%] tracking-[-1%] whitespace-nowrap">{project.name}</h3>
+                          <h3 class="text-sm leading-[100%] tracking-[-1%] opacity-0 whitespace-nowrap">{project.type}</h3>
                         </div>
-                        <div class="absolute z-1 mt-0 ml-0 mr-0 h-full w-full ">
-
-                        </div>
+                        <div class="title-fade-overlay absolute inset-0 h-full w-full z-1 pointer-events-none opacity-0 bg-[linear-gradient(to_left,rgba(255,255,255,1)_60%,rgba(255,255,255,0.2)_100%)]"></div>
                         <div class="flex flex-col gap-0 items-end grow z-2">
                           <p class="text-sm leading-[100%] tracking-[-1%] flex">{project.index}</p>
                           <p class="text-sm leading-[100%] flex opacity-0 -z-10">
@@ -173,23 +171,33 @@ function getAspect(project: (typeof projects)[number]): number {
 
   // ─── Edge fade ─────────────────────────────────────────────────────────────
 
-  function fadeEdge(items: HTMLElement[]) {
+  function fadeEdge(items: HTMLElement[], side: 'left' | 'right') {
     items.forEach((item) => {
-      const projectTitle = item.querySelector('.project-title');
-      if (projectTitle) {
-        gsap.to(projectTitle, { display: 'none', duration: 0, ease: EASE, overwrite: 'auto' });
+      const overlay = item.querySelector('.title-fade-overlay') as HTMLElement;
+      if (overlay) {
+        const gradient =
+
+            'linear-gradient(to left, rgba(255,255,255,1) 60%, rgba(255,255,255,0.2) 100%)'
+
+        gsap.to(overlay, {
+          background: gradient,
+          opacity: 1,
+          duration: DURATION,
+          ease: EASE,
+          overwrite: 'auto',
+        });
       }
     });
   }
 
   function restoreEdge(items: HTMLElement[]) {
     items.forEach((item) => {
-      const projectTitle = item.querySelector('.project-title');
-      if (projectTitle) {
-        gsap.to(projectTitle, {
-          display: 'block',
-          duration: 0,
-          delay: 0.1,
+      const overlay = item.querySelector('.title-fade-overlay') as HTMLElement;
+      if (overlay) {
+        gsap.to(overlay, {
+          background: 'gradient',
+          opacity:0,
+          duration: DURATION,
           ease: EASE,
           overwrite: 'auto',
         });
@@ -202,6 +210,7 @@ function getAspect(project: (typeof projects)[number]): number {
     const previousFadedItems = fadedEdge.get(row) ?? [];
 
     let currentTargetItems: HTMLElement[] = [];
+    let currentSide: 'left' | 'right' = 'left';
 
     const rect = row.getBoundingClientRect();
     const cursorX = e.clientX - rect.left;
@@ -209,8 +218,10 @@ function getAspect(project: (typeof projects)[number]): number {
     const isLeftHalf = cursorX < rowWidth / 2;
 
     if (isLeftHalf) {
+      currentSide = 'right';
       currentTargetItems = [items[n - 1], items[n - 2]].filter(Boolean);
     } else {
+      currentSide = 'left';
       currentTargetItems = [items[0], items[1]].filter(Boolean);
     }
 
@@ -220,7 +231,7 @@ function getAspect(project: (typeof projects)[number]): number {
 
     if (isChanged) {
       if (previousFadedItems.length > 0) restoreEdge(previousFadedItems);
-      if (currentTargetItems.length > 0) fadeEdge(currentTargetItems);
+      if (currentTargetItems.length > 0) fadeEdge(currentTargetItems, currentSide);
 
       fadedEdge.set(row, currentTargetItems);
     }
