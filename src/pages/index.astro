@@ -312,7 +312,7 @@ function getAspect(project: (typeof projects)[number]): number {
     // Translate the container down by the largest possible hover expansion
     // across all rows, so the effect has room to grow upward without clipping.
     const maxDelta = Math.max(...allWrappers.map((_, i) => calcMaxDelta(i)));
-    gsap.set(container, { y: maxDelta });
+    gsap.set(container, { y: maxDelta + 20 });
 
     container.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
       const video = item.querySelector('mux-player') as HTMLVideoElement & { play: () => void; pause: () => void } | null;

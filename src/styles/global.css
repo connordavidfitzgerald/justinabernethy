@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --text-sm: 0.725rem;
-  --text-md: 0.725rem;
+  --text-sm: 0.75rem;
+  --text-md: 0.75rem;
 }
 
 body {
