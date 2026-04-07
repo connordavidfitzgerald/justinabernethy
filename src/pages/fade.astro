@@ -180,7 +180,7 @@ function getAspect(project: (typeof projects)[number]): number {
             'linear-gradient(to left, rgba(255,255,255,1) 60%, rgba(255,255,255,0.2) 100%)'
 
         gsap.to(overlay, {
-          background: gradient,
+
           opacity: 1,
           duration: DURATION,
           ease: EASE,
@@ -195,7 +195,7 @@ function getAspect(project: (typeof projects)[number]): number {
       const overlay = item.querySelector('.title-fade-overlay') as HTMLElement;
       if (overlay) {
         gsap.to(overlay, {
-          background: 'gradient',
+
           opacity:0,
           duration: DURATION,
           ease: EASE,
