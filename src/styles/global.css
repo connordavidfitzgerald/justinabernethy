@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --text-sm: 0.725rem;
+  --text-md: 0.725rem;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale; /* Equivalent for Firefox on macOS */
+}

@@ -1,0 +1,49 @@
+---
+import "../styles/global.css";
+import { Font, type CssVariable } from "astro:assets";
+
+export interface Props {
+    title: string;
+    description?: string;
+}
+
+const {
+    title,
+    description = "Astro + Tailwind + Sanity + Mux + GSAP + Cloudflare",
+} = Astro.props;
+const FONTS: CssVariable[] = ["--font-sans"];
+---
+
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" href="/favicon.ico" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="generator" content={Astro.generator} />
+        <meta name="description" content={description} />
+        {FONTS.map((font) => <Font cssVariable={font} preload />)}
+        <title>{title}</title>
+    </head>
+    <body class="min-h-screen var(--font-sans) uppercase">
+        <div
+            class="fixed top-0 left-0 right-0 h-fit flex flex-row justify-between text-md px-1.5 z-50 text-black pt-1 pb-1 tracking-[-1%] bg-white"
+        >
+            <h3 class="">Justin Abernethy</h3>
+            <h3 class="">Information</h3>
+        </div>
+        <slot />
+    </body>
+</html>
+
+<script>
+    import Lenis from "lenis";
+    const lenis = new Lenis({
+        autoRaf: true,
+    });
+
+    // Listen for the scroll event and log the event data
+    lenis.on("scroll", (e) => {
+        console.log(e);
+    });
+</script>

@@ -1,17 +1,328 @@
 ---
+import Layout from '../layouts/Layout.astro';
 
+import { MuxPlayer } from '@mux/mux-player-astro';
+import { loadQuery } from '../sanity/lib/loadQuery.ts';
+import { urlForImage } from '../sanity/lib/url-for-image.ts';
+
+import { sanityClient } from 'sanity:client';
+
+const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
+ _id,
+  name,
+  type,
+  index,
+  thumbnail,
+  imageGallery,
+  muxID,
+}`;
+
+const { data: projects } = await loadQuery({ query: PROJECTS_QUERY });
+console.log('projects:', projects);
+
+const ROW_SIZE = 5;
+
+// Chunk into rows of ROW_SIZE
+const rows = Array.from({ length: Math.ceil(projects.length / ROW_SIZE) }, (_, i) =>
+  projects.slice(i * ROW_SIZE, i * ROW_SIZE + ROW_SIZE)
+);
+
+// aspect is h/w — portrait 2/3 = 1.5, landscape 16/9 ≈ 0.5625
+function getAspect(project: (typeof projects)[number]): number {
+  return project.muxID && !project.thumbnail?.asset ? 9 / 16 : 7 / 5;
+}
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Layout>
+  <main class="p-1.5 bg-white text-black">
+    <section class="">
+      {projects.length === 0 && <p class="text-gray-400">No projects found.</p>}
+
+      <div id="gallery-container" class="flex flex-col gap-3 translate-y-[250px]">
+        {
+          rows.map((row, rowIndex) => (
+            <div class="gallery-row-wrapper relative" data-wrapper={rowIndex}>
+              <div
+                class="gallery-row absolute inset-x-0 bottom-0 flex gap-1.5 items-end"
+                data-row={rowIndex}
+              >
+                {row.map((project, projectIndex) => {
+                  const aspect = getAspect(project);
+                  const globalIndex = rowIndex * ROW_SIZE + projectIndex;
+                  return (
+                    <div
+                      class="gallery-item flex flex-col gap-1.5 min-w-0"
+                      style="flex: 1 1 0%"
+                      data-aspect={aspect}
+                      data-row={rowIndex}
+                      data-global-index={globalIndex}
+                    >
+                      {project.muxID && !project.thumbnail?.asset ? (
+                        <MuxPlayer
+                          playbackId={project.muxID}
+                          class="item-media w-full object-cover aspect-16/9"
+                          style={{ '--controls': 'none' }}
+                          muted
+                          loop
+                        />
+                      ) : (
+                        <img
+                          src={urlForImage(project.thumbnail).url()}
+                          alt={project.name}
+                          class="item-media w-full object-cover"
+                          style="aspect-ratio: 5/7"
+                        />
+                      )}
+                      <div class="item-name-type flex flex-row justify-between w-full">
+                        <div class="flex flex-col gap-0 w-fit project-title">
+                          <h3 class="text-sm leading-[100%] tracking-[-1%]">{project.name}</h3>
+                          <h3 class="text-sm leading-[100%] tracking-[-1%] opacity-0">{project.type}</h3>
+
+                        </div>
+                        <div class="flex flex-col gap-0">
+                          <p class="text-sm leading-[100%] tracking-[-1%] flex">{project.index}</p>
+                          <p class="text-sm leading-[100%] flex opacity-0 -z-10">
+                            {project.index}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import gsap from 'gsap';
+
+  const FALLOFF = 0.65;
+  const ITEM_GAP_PX = 5;
+  const DURATION = 0.7;
+  const EASE = 'power3.out';
+  const LEAVE_DELAY = 0;
+
+  const container = document.getElementById('gallery-container')!;
+  const allWrappers = [...container.querySelectorAll<HTMLElement>('.gallery-row-wrapper')];
+  const allRows = [...container.querySelectorAll<HTMLElement>('.gallery-row')];
+
+  let activeRow: HTMLElement | null = null;
+  let activeRowIndex: number = -1;
+  let leaveTimer: gsap.core.Tween | null = null;
+  let aboveTimer: gsap.core.Tween | null = null;
+
+  // Tracks which opposite-edge item is currently faded, per row
+  const fadedEdge = new Map<HTMLElement, HTMLElement | null>();
+
+  function getAspects(row: HTMLElement): number[] {
+    return [...row.querySelectorAll<HTMLElement>('.gallery-item')].map((item) =>
+      parseFloat(item.dataset.aspect!)
+    );
+  }
+
+  function getWeights(cursorPos: number, n: number): number[] {
+    return Array.from({ length: n }, (_, j) => Math.pow(FALLOFF, Math.abs(cursorPos - (j + 0.5))));
+  }
+
+  function calcBaseHeight(rowIndex: number): number {
+    const width = allWrappers[rowIndex].getBoundingClientRect().width;
+    const aspects = getAspects(allRows[rowIndex]);
+    const n = aspects.length;
+    const available = width - (n - 1) * ITEM_GAP_PX;
+    const baseW = available / n;
+    return Math.max(...aspects.map((a) => baseW * a));
+  }
+
+  function calcMaxDelta(rowIndex: number): number {
+    const width = allWrappers[rowIndex].getBoundingClientRect().width;
+    const aspects = getAspects(allRows[rowIndex]);
+    const n = aspects.length;
+    const available = width - (n - 1) * ITEM_GAP_PX;
+    const baseH = calcBaseHeight(rowIndex);
+
+    const samplePositions = [0, n, ...Array.from({ length: n }, (_, j) => j + 0.5)];
+
+    let maxDelta = 0;
+    for (const cursorPos of samplePositions) {
+      const weights = getWeights(cursorPos, n);
+      const sum = weights.reduce((a, b) => a + b, 0);
+      const maxNewH = Math.max(...aspects.map((a, j) => ((available * weights[j]) / sum) * a));
+      maxDelta = Math.max(maxDelta, maxNewH - baseH);
+    }
+
+    return Math.max(0, maxDelta);
+  }
+
+  function lockHeights() {
+    allRows.forEach((row) => {
+      row.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
+        item.style.flexGrow = '1';
+      });
+    });
+    allRows.forEach((row, i) => {
+      allWrappers[i].style.height = `${row.getBoundingClientRect().height}px`;
+    });
+  }
+
+  // ─── Edge fade ─────────────────────────────────────────────────────────────
+
+  function fadeEdge(items: HTMLElement[]) {
+    items.forEach((item) => {
+      const projectTitle = item.querySelector('.project-title');
+      if (projectTitle) {
+        gsap.to(projectTitle, { display: 'none', duration: 0, ease: EASE, overwrite: 'auto' });
+      }
+    });
+  }
+
+  function restoreEdge(items: HTMLElement[]) {
+    items.forEach((item) => {
+      const projectTitle = item.querySelector('.project-title');
+      if (projectTitle) {
+        gsap.to(projectTitle, {
+          display: 'block',
+          duration: 0,
+          delay: 0.1,
+          ease: EASE,
+          overwrite: 'auto',
+        });
+      }
+    });
+  }
+
+  function updateEdgeFade(row: HTMLElement, e: MouseEvent, n: number) {
+    const items = [...row.querySelectorAll<HTMLElement>('.gallery-item')];
+    const previousFadedItems = fadedEdge.get(row) ?? [];
+
+    let currentTargetItems: HTMLElement[] = [];
+
+    const rect = row.getBoundingClientRect();
+    const cursorX = e.clientX - rect.left;
+    const rowWidth = rect.width;
+    const isLeftHalf = cursorX < rowWidth / 2;
+
+    if (isLeftHalf) {
+      currentTargetItems = [items[n - 1], items[n - 2]].filter(Boolean);
+    } else {
+      currentTargetItems = [items[0], items[1]].filter(Boolean);
+    }
+
+    const isChanged =
+      currentTargetItems.length !== previousFadedItems.length ||
+      currentTargetItems.some((item, i) => item !== previousFadedItems[i]);
+
+    if (isChanged) {
+      if (previousFadedItems.length > 0) restoreEdge(previousFadedItems);
+      if (currentTargetItems.length > 0) fadeEdge(currentTargetItems);
+
+      fadedEdge.set(row, currentTargetItems);
+    }
+  }
+
+  function clearEdgeFade(row: HTMLElement) {
+    const faded = fadedEdge.get(row);
+    if (faded) {
+      restoreEdge(faded);
+      fadedEdge.set(row, null);
+    }
+  }
+
+  // ─── Animation ─────────────────────────────────────────────────────────────
+
+  function animateItems(row: HTMLElement, weights: number[]) {
+    row.querySelectorAll<HTMLElement>('.gallery-item').forEach((item, j) => {
+      gsap.to(item, { flexGrow: weights[j], duration: DURATION, ease: EASE, overwrite: 'auto' });
+    });
+  }
+
+  function resetRow(row: HTMLElement) {
+    row.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
+      gsap.to(item, { flexGrow: 1, duration: DURATION, ease: EASE, overwrite: 'auto' });
+    });
+    clearEdgeFade(row);
+    gsap.set(row, { zIndex: 'auto' });
+  }
+
+  function pushAbove(rowIndex: number, delta: number) {
+    allWrappers.forEach((wrapper, i) => {
+      if (i < rowIndex) {
+        gsap.to(wrapper, { y: -delta, duration: DURATION, ease: EASE, overwrite: 'auto' });
+      } else {
+        gsap.to(wrapper, { y: 0, duration: DURATION, ease: EASE, overwrite: 'auto' });
+      }
+    });
+  }
+
+  function resetAbove() {
+    allWrappers.forEach((wrapper) => {
+      gsap.to(wrapper, { y: 0, duration: DURATION, ease: EASE, overwrite: 'auto' });
+    });
+  }
+
+  // ─── Events ────────────────────────────────────────────────────────────────
+
+  allRows.forEach((row, rowIndex) => {
+    row.addEventListener('mouseenter', () => {
+      leaveTimer?.kill();
+      leaveTimer = null;
+      aboveTimer?.kill();
+      aboveTimer = null;
+
+      if (activeRow && activeRow !== row) resetRow(activeRow);
+      activeRow = row;
+      activeRowIndex = rowIndex;
+
+      gsap.set(row, { zIndex: 10 });
+      pushAbove(rowIndex, calcMaxDelta(rowIndex));
+    });
+
+    row.addEventListener('mousemove', (e: MouseEvent) => {
+      if (activeRow !== row) return;
+
+      const items = [...row.querySelectorAll<HTMLElement>('.gallery-item')];
+      const n = items.length;
+      const rect = row.getBoundingClientRect();
+      const cursorPos = ((e.clientX - rect.left) / rect.width) * n;
+
+      animateItems(row, getWeights(cursorPos, n));
+      updateEdgeFade(row, e, n);
+    });
+    row.addEventListener('mouseleave', () => {
+      leaveTimer = gsap.delayedCall(0, () => {
+        if (activeRow) resetRow(activeRow);
+        activeRow = null;
+        activeRowIndex = -1;
+      });
+      aboveTimer = gsap.delayedCall(LEAVE_DELAY, resetAbove);
+    });
+  });
+
+
+
+  // ─── Init ──────────────────────────────────────────────────────────────────
+
+  function init() {
+    lockHeights();
+
+    // Translate the container down by the largest possible hover expansion
+    // across all rows, so the effect has room to grow upward without clipping.
+    const maxDelta = Math.max(...allWrappers.map((_, i) => calcMaxDelta(i)));
+    gsap.set(container, { y: maxDelta });
+
+    container.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
+      const video = item.querySelector('mux-player') as HTMLVideoElement & { play: () => void; pause: () => void } | null;
+      if (!video) return;
+
+      item.addEventListener('mouseenter', () => video.play());
+      item.addEventListener('mouseleave', () => video.pause());
+    });
+  }
+
+  init();
+  window.addEventListener('resize', init);   // replaces the old resize → lockHeights
+</script>
