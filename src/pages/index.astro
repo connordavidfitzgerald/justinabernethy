@@ -38,7 +38,7 @@ function getAspect(project: (typeof projects)[number]): number {
     <section class="">
       {projects.length === 0 && <p class="text-gray-400">No projects found.</p>}
 
-      <div id="gallery-container" class="flex flex-col gap-3 translate-y-[250px]">
+      <div id="gallery-container" class="flex flex-col gap-3">
         {
           rows.map((row, rowIndex) => (
             <div class="gallery-row-wrapper relative" data-wrapper={rowIndex}>
