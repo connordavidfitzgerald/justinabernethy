@@ -67,7 +67,7 @@ function getAspect(project: (typeof projects)[number]): number {
                         />
                       ) : (
                         <img
-                          src={urlForImage(project.thumbnail).url()}
+                        src={`${urlForImage(project.thumbnail).url()}?auto=format`}
                           alt={project.name}
                           class="item-media w-full object-cover"
                           style="aspect-ratio: 5/7"

@@ -99,10 +99,10 @@ function getAspect(project: (typeof projects)[number]): number {
   import gsap from 'gsap';
 
   const FALLOFF = 0.65;
-  const ITEM_GAP_PX = 0.5;
-  const DURATION = 1;
-  const DURATION_ALT = 0.65;
-  const EASE = 'power2.out';
+  const ITEM_GAP_PX = 5;
+  const DURATION = 0.9;
+  const DURATION_ALT = 0.6;
+  const EASE = 'power3.out';
 
   const container = document.getElementById('gallery-container')!;
   const allWrappers = [...container.querySelectorAll<HTMLElement>('.gallery-row-wrapper')];
@@ -294,7 +294,7 @@ function getAspect(project: (typeof projects)[number]): number {
 
   function resetAbove() {
     allWrappers.forEach((wrapper) => {
-      gsap.to(wrapper, { y: 0, duration: DURATION_ALT, ease: EASE, overwrite: 'auto' });
+      gsap.to(wrapper, { y: 0, duration: DURATION, ease: EASE, overwrite: 'auto' });
     });
   }
 
@@ -344,24 +344,14 @@ function getAspect(project: (typeof projects)[number]): number {
 
     });
   });
-  let ticking = false;
 
-  window.addEventListener('scroll', () => {
-    if (!ticking) {
-      requestAnimationFrame(() => {
-        updateHoverAtPoint(lastMouseX, lastMouseY);
-        ticking = false;
-      });
-      ticking = true;
-    }
-  });
   // ─── Init ──────────────────────────────────────────────────────────────────
 
   function init() {
     lockHeights();
 
     const maxDelta = Math.max(...allWrappers.map((_, i) => calcMaxDelta(i)));
-    gsap.set(container, { y: maxDelta - 5 });
+    gsap.set(container, { y: maxDelta + 20 });
 
     container.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
       const video = item.querySelector('mux-player') as (HTMLVideoElement & { play: () => void; pause: () => void }) | null;

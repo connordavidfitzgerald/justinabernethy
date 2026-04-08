@@ -4,8 +4,11 @@ import { defineConfig, fontProviders } from "astro/config";
 import tailwindcss from "@tailwindcss/vite";
 
 import lenis from "astro-lenis";
-
 import sanity from "@sanity/astro";
+
+import svelte from "@astrojs/svelte";
+
+import react from "@astrojs/react";
 
 // https://astro.build/config
 export default defineConfig({
@@ -33,7 +36,6 @@ export default defineConfig({
   ],
 
   integrations: [
-    lenis(),
     sanity({
       projectId: "t3fe0x9u",
       dataset: "production",
@@ -41,5 +43,7 @@ export default defineConfig({
       useCdn: false,
       apiVersion: "2026-04-01",
     }),
+    svelte(),
+    react(),
   ],
 });
