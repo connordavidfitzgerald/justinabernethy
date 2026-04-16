@@ -11,8 +11,28 @@ const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
   name,
   type,
   index,
-  thumbnail,
-  imageGallery,
+  thumbnail {
+      ...,
+      asset-> {
+        _id,
+        url,
+        metadata {
+          dimensions,
+          lqip
+        }
+      }
+    },
+  imageGallery[] {
+      _key,
+      asset-> {
+        _id,
+        url,
+        metadata {
+          dimensions,
+          lqip
+        }
+      }
+    },
   muxID,
 }`;
 
@@ -767,9 +787,15 @@ const projectsWithUrls = projects.map(project => ({
         populateProjectDetail(project);
 
         // Fade in new gallery
+
         gsap.fromTo(detailImageGallery.children,
           { opacity: 0, y: 10 },
           { opacity: 1, y: 0, duration: DURATION, ease: EASE, stagger: 0.03 }
+        );
+        const galleryCovers = detailImageGallery.querySelectorAll('.gallery-image-cover');
+        gsap.fromTo(galleryCovers,
+          { y: 0 },
+          { y: '-100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: DURATION/2 }
         );
       }
     });
@@ -876,6 +902,7 @@ const projectsWithUrls = projects.map(project => ({
       if (projectId) {
         transitionToProject(projectId);
       }
+
     });
 
     // Hover preview in sidebar
