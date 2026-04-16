@@ -38,7 +38,7 @@ export default defineConfig({
           {
             weight: 700,
             style: "normal",
-            src: ["./src/assets/fonts/AntiqueLegacy-SemiBold.otf"],
+            src: ["./src/assets/fonts/AntiqueLegacy-Semibold.otf"],
             display: "block",
           },
         ],
