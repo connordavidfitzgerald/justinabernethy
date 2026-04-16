@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-
+import { Picture } from 'astro:assets';
 import { MuxPlayer } from '@mux/mux-player-astro';
 import { loadQuery } from '../sanity/lib/loadQuery.ts';
 import { urlForImage } from '../sanity/lib/url-for-image.ts';
@@ -218,10 +218,33 @@ const projectsWithUrls = projects.map(project => ({
           </div>
         </div>
       </div>
-      <div class="h-[200vh] w-full"></div>
 
+      <div id="single-view-overlay" class="fixed inset-0 z-[10000] bg-theme hidden opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="h-screen w-full grid! grid-cols-20 gap-padding bg-theme text-theme text-sm tracking-custom uppercase relative px-padding">
+
+          <!-- Left Controls (initially hidden) -->
+          <div class="col-span-3 h-full w-full flex flex-row items-center justify-between pr-padding">
+            <a id="overlay-exit" class="overlay-nav opacity-muted hover:opacity-100 cursor-pointer ">Exit</a>
+            <a id="overlay-prev" class="overlay-nav opacity-100 cursor-pointer hover:opacity-muted">Previous</a>
+          </div>
+
+          <!-- Center Media (initially hidden/scaled) -->
+          <div class="col-span-14 h-screen w-full flex flex-row justify-center items-center overflow-clip">
+            <div id="overlay-media-container" class="w-full h-full flex items-center justify-center opacity-0">
+              <!-- Media injected via JS -->
+            </div>
+          </div>
+
+          <!-- Right Controls (initially hidden) -->
+          <div class="col-span-3 col-start-18 h-full w-full flex flex-row items-center justify-between pl-padding">
+            <a id="overlay-next" class="overlay-nav opacity-100 cursor-pointer hover:opacity-muted">Next</a>
+            <p id="overlay-pagination" class="opacity-100 overlay-nav">1/5</p>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
+
 </Layout>
 
 <!-- Pass project data to client -->
@@ -231,7 +254,8 @@ const projectsWithUrls = projects.map(project => ({
 </script>
 
 <script>
-  import gsap from 'gsap';
+  import { overwrite } from 'astro:schema';
+import gsap from 'gsap';
 
 
   // ─── Constants ─────────────────────────────────────────────────────────────
@@ -249,8 +273,8 @@ const projectsWithUrls = projects.map(project => ({
   const MOVE_DURATION = 1.2;
   const MOVE_DELAY = 0.7;
 
-  const VERTICAL_THRESHOLD = 0.85;
-  const INTENSITY_MULTIPLIER = 1;
+  const VERTICAL_THRESHOLD = 0.9;
+  const INTENSITY_MULTIPLIER = 0.8;
   const CURVE_POWER = 1;
   // Helper to get theme-aware muted opacity
   function getMutedOpacity(): number {
@@ -353,6 +377,8 @@ const projectsWithUrls = projects.map(project => ({
     firstSlot.className = 'col-span-1 w-full overflow-visible';
     firstSlot.id = 'detail-first-image';
 
+    attachDetailGalleryListeners();
+
     if (project.muxID && !project.thumbnailUrl) {
       firstSlot.innerHTML = `
         <mux-player
@@ -404,6 +430,7 @@ const projectsWithUrls = projects.map(project => ({
         gsap.to(item, { opacity: getMutedOpacity()});
       }
     });
+    attachDetailGalleryListeners();
   }
 
   function openProject(projectId: string, clickedItem: HTMLElement) {
@@ -651,11 +678,13 @@ const projectsWithUrls = projects.map(project => ({
 
         // Setup scroll observer AFTER all DOM changes are complete
         setupScrollObserver();
+
       } else {
         // Fallback: just remove clone
         clone.remove();
         isAnimating = false;
         setupScrollObserver();
+
       }
     });
   }
@@ -873,25 +902,31 @@ const projectsWithUrls = projects.map(project => ({
   });
 
   // Gallery item click handlers
+  // Replace or augment your existing click handler:
   allItems.forEach(item => {
-    item.addEventListener('click', () => {
+    item.addEventListener('click', (e) => {
+      // Prevent overlay from triggering if clicking on project detail list items
+      if (e.target.closest('.detail-list-item')) return;
+
       const projectId = item.dataset.projectId;
+      const globalIndex = parseInt(item.dataset.globalIndex || '0');
+
       if (!projectId) return;
 
       if (!isProjectOpen) {
+        // Existing behavior: open project detail view
         openProject(projectId, item);
       } else {
-        // If project is open, check if clicked item is in a visible row (below current project's row)
+        // If project detail is open and clicking a visible gallery item below
         const itemRow = parseInt(item.dataset.row || '0');
         if (itemRow > clickedRowIndex) {
-          // Close current project and open the new one
           closeProject(true);
-          // Small delay to let close complete before opening new project
           setTimeout(() => {
             openProject(projectId, item);
           }, 50);
         }
       }
+
     });
   });
 
@@ -1121,7 +1156,7 @@ const projectsWithUrls = projects.map(project => ({
 
     // Factor for row above (when cursor near top)
     let aboveVerticalFactor = 0;
-    const ABOVE_THRESHOLD = 0.1; // 0.25 when VERTICAL_THRESHOLD is 0.75
+    const ABOVE_THRESHOLD = 0.05; // 0.25 when VERTICAL_THRESHOLD is 0.75
     if (cursorYNorm < ABOVE_THRESHOLD) {
       let progress = (ABOVE_THRESHOLD - cursorYNorm) / ABOVE_THRESHOLD;
       aboveVerticalFactor = Math.pow(progress, CURVE_POWER) * INTENSITY_MULTIPLIER;
@@ -1170,16 +1205,17 @@ const projectsWithUrls = projects.map(project => ({
     // Only animate wrappers that need to change
     allWrappers.forEach((wrp, i) => {
       // Skip wrappers that are hidden when project is open (respect computed firstVisibleIndex)
-      if (isProjectOpen && i < firstVisibleIndex) return;
+
 
       let yPush = 0;
+
       if (i < targetRowIndex) {
-        yPush = -(activeDelta + belowDelta);
+        yPush = -activeDelta;
         // Rows above the prevRow also need to account for prevRow expansion
-        if (hasPrevRow && i < prevRowIndex) {
-          setTimeout(() => {
-            yPush = -aboveDelta;
-          }, 10);
+        if (i < prevRowIndex) {
+
+            yPush = -aboveDelta-activeDelta
+
         }
       } else if (i === targetRowIndex) {
 
@@ -1292,6 +1328,353 @@ const projectsWithUrls = projects.map(project => ({
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SINGLE VIEW OVERLAY LOGIC
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SINGLE VIEW OVERLAY LOGIC
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  let overlayState = {
+    isOpen: false,
+    projectId: null,
+    currentIndex: 0,
+    mediaItems: []
+  };
+
+  const overlay = document.getElementById('single-view-overlay');
+  const overlayMediaContainer = document.getElementById('overlay-media-container');
+  const overlayPagination = document.getElementById('overlay-pagination');
+  const overlayExit = document.getElementById('overlay-exit');
+  const overlayPrev = document.getElementById('overlay-prev');
+  const overlayNext = document.getElementById('overlay-next');
+
+  function buildMediaItems(project) {
+    const items = [];
+
+    // Index 0: Thumbnail
+    if (project.muxID && !project.thumbnailUrl) {
+      items.push({ type: 'video', playbackId: project.muxID, alt: project.name, _key: 'thumbnail' });
+    } else if (project.thumbnailUrl) {
+      items.push({ type: 'image', url: project.thumbnailUrl, alt: project.name, _key: 'thumbnail' });
+    }
+
+    // Index 1+: Gallery images
+    if (project.galleryUrls?.length) {
+      project.galleryUrls.forEach(img => {
+        items.push({ type: 'image', url: img.url, alt: project.name, _key: img._key });
+      });
+    }
+
+    return items;
+  }
+
+  function renderOverlayMedia() {
+    if (!overlayMediaContainer) return;
+
+    const item = overlayState.mediaItems[overlayState.currentIndex];
+    if (!item) return;
+
+    overlayMediaContainer.innerHTML = '';
+
+    if (item.type === 'video') {
+      const player = document.createElement('mux-player');
+      player.setAttribute('playback-id', item.playbackId);
+      player.className = 'w-full h-auto max-h-screen object-contain';
+      player.setAttribute('autoplay', '');
+      player.setAttribute('loop', '');
+      player.setAttribute('muted', '');
+      player.setAttribute('playsinline', '');
+      player.style.setProperty('--controls', 'none');
+      overlayMediaContainer.appendChild(player);
+    } else {
+      const img = document.createElement('img');
+      img.src = item.url;
+      img.alt = item.alt || '';
+      img.className = 'w-auto h-full max-w-full max-h-screen object-contain';
+      img.loading = 'eager';
+      overlayMediaContainer.appendChild(img);
+    }
+
+    if (overlayPagination) {
+      overlayPagination.textContent = `${overlayState.currentIndex + 1}/${overlayState.mediaItems.length}`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FIX: Reset inline styles for ALL nav items to allow CSS Hovers
+    // ═══════════════════════════════════════════════════════════════
+    const allNavItems = [overlayExit, overlayPrev, overlayNext, overlayPagination];
+
+    allNavItems.forEach(el => {
+      if (el) {
+        // 1. Clear the inline opacity left by the close animation
+        el.style.opacity = '';
+
+        // 2. Ensure pointer events are re-enabled (unless specifically disabled below)
+        if (el !== overlayPrev && el !== overlayNext) {
+            el.style.pointerEvents = 'auto';
+        }
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // FIX: Use Classes instead of Inline Styles for Disabled State
+    // ═══════════════════════════════════════════════════════════════
+
+    // Handle Previous Button
+    if (overlayPrev) {
+      if (overlayState.currentIndex === 0) {
+        // Disabled state: Remove hover classes, add muted class
+        overlayPrev.classList.remove('opacity-100', 'hover:opacity-muted');
+        overlayPrev.classList.add('opacity-muted');
+        overlayPrev.style.pointerEvents = 'none'; // Disable clicking
+      } else {
+        // Active state: Add hover classes
+        overlayPrev.classList.remove('opacity-muted');
+        overlayPrev.classList.add('opacity-100', 'hover:opacity-muted');
+        overlayPrev.style.pointerEvents = 'auto';
+      }
+    }
+
+    // Handle Next Button
+    if (overlayNext) {
+      if (overlayState.currentIndex === overlayState.mediaItems.length - 1) {
+        // Disabled state
+        overlayNext.classList.remove('opacity-100', 'hover:opacity-muted');
+        overlayNext.classList.add('opacity-muted');
+        overlayNext.style.pointerEvents = 'none';
+      } else {
+        // Active state
+        overlayNext.classList.remove('opacity-muted');
+        overlayNext.classList.add('opacity-100', 'hover:opacity-muted');
+        overlayNext.style.pointerEvents = 'auto';
+      }
+    }
+  }
+
+  function openOverlay(projectId, startIndex = 0) {
+    const project = getProjectById(projectId);
+    if (!project || !overlay) return;
+
+    // Pause gallery videos to avoid audio overlap
+    document.querySelectorAll('mux-player').forEach(player => {
+      if (player.pause) player.pause();
+    });
+
+    // Set state BEFORE animation
+    overlayState.projectId = projectId;
+    overlayState.mediaItems = buildMediaItems(project);
+    overlayState.currentIndex = Math.max(0, Math.min(startIndex, overlayState.mediaItems.length - 1));
+    overlayState.isOpen = true;
+
+    // Prevent body scroll immediately
+    document.body.style.overflow = 'hidden';
+
+    // Show overlay container (but keep children hidden for animation)
+    overlay.classList.remove('hidden');
+
+    // Force reflow so transitions work
+    void overlay.offsetHeight;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STAGGERED ANIMATION TIMELINE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+    // Step 1: Fade in overlay background
+    tl.to(overlay, {
+      opacity: 1,
+      duration: 0.3,
+      onStart: () => {
+        overlay.style.pointerEvents = 'auto';
+      }
+    });
+
+    // Step 2: Render media, then fade + scale it in
+    tl.call(() => {
+      renderOverlayMedia();
+    }, null, 0.25)
+    .to('#overlay-media-container', {
+      delay: 0.5,
+      opacity: 1,
+      duration: 0.4,
+      ease: 'power2.out'
+    }, 0.25);
+  }
+
+  function closeOverlay() {
+    if (!overlayState.isOpen || !overlay) return;
+
+    overlayState.isOpen = false;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // REVERSE ANIMATION TIMELINE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const tl = gsap.timeline({
+      defaults: { ease: 'power3.in' },
+      onComplete: () => {
+        // Final cleanup after animation
+        overlay.classList.add('hidden');
+        overlay.style.pointerEvents = 'none';
+        overlayMediaContainer.innerHTML = ''; // Clean up media
+        document.body.style.overflow = ''; // Restore scroll
+
+        // Resume gallery videos that should autoplay on hover
+        document.querySelectorAll('.gallery-item mux-player').forEach(player => {
+          if (player.play && player.closest('.gallery-item:hover')) {
+            player.play();
+          }
+        });
+      }
+    });
+
+    // Step 1: Fade out navigation items (reverse stagger)
+    const navItems = [
+      overlayExit, overlayPrev, overlayNext, overlayPagination
+    ].filter(el => el);
+
+    tl.to(navItems, {
+      opacity: 0,
+
+      duration: 0.25,
+      stagger: {
+        each: 0.05,
+        from: 'end', // Right to left on close
+        ease: 'power2.in'
+      },
+
+    });
+
+    // Step 2: Fade + scale out media (0.15s after nav starts)
+    tl.to('#overlay-media-container', {
+      opacity: 0,
+      duration: 0.3
+    }, 0.15);
+
+    // Step 3: Fade out overlay background (last)
+    tl.to(overlay, {
+      opacity: 0,
+      duration: 0.6,
+      ease: 'power2.out'
+    });
+  }
+
+  function nextMedia() {
+    if (overlayState.currentIndex < overlayState.mediaItems.length - 1) {
+      overlayState.currentIndex++;
+      renderOverlayMedia();
+    }
+  }
+
+  function prevMedia() {
+    if (overlayState.currentIndex > 0) {
+      overlayState.currentIndex--;
+      renderOverlayMedia();
+    }
+  }
+
+  // ─── Overlay Control Event Listeners ─────────────────────────────────────
+  if (overlayExit) {
+    overlayExit.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeOverlay();
+    });
+  }
+
+  if (overlayNext) {
+    overlayNext.addEventListener('click', (e) => {
+      e.preventDefault();
+      nextMedia();
+    });
+  }
+
+  if (overlayPrev) {
+    overlayPrev.addEventListener('click', (e) => {
+      e.preventDefault();
+      prevMedia();
+    });
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (!overlayState.isOpen) return;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeOverlay();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      nextMedia();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      prevMedia();
+    }
+  });
+
+  // Click outside media to close
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        closeOverlay();
+      }
+    });
+  }
+
+  // ─── Attach Click Handlers to Detail Gallery Images ──────────────────────
+  let detailGalleryListenerAttached = false; // ← Prevent duplicate listeners
+
+  function attachDetailGalleryListeners() {
+    if (!detailImageGallery || detailGalleryListenerAttached) return;
+
+    detailGalleryListenerAttached = true; // ← Mark as attached
+
+    // Use event delegation on the container
+    detailImageGallery.addEventListener('click', (e) => {
+      // Find the clicked slot
+      const slot = e.target.closest('#detail-first-image, .col-span-1.w-full.overflow-hidden');
+      if (!slot) return; // ← Removed: || !overlayState.isOpen
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const projectId = currentProjectId;
+      if (!projectId) {
+        console.warn('No currentProjectId found');
+        return;
+      }
+
+      // Get project data
+      const project = getProjectById(projectId);
+      if (!project) return;
+
+      // Build media items array (same as overlay logic)
+      const mediaItems = [];
+      if (project.muxID && !project.thumbnailUrl) {
+        mediaItems.push({ type: 'video', playbackId: project.muxID, _key: 'thumbnail' });
+      } else if (project.thumbnailUrl) {
+        mediaItems.push({ type: 'image', url: project.thumbnailUrl, _key: 'thumbnail' });
+      }
+      if (project.galleryUrls?.length) {
+        project.galleryUrls.forEach(img => {
+          mediaItems.push({ type: 'image', url: img.url, _key: img._key });
+        });
+      }
+
+      // Determine clicked index
+      let clickedIndex = 0;
+      if (slot.id !== 'detail-first-image') {
+        const slots = [...detailImageGallery.querySelectorAll('#detail-first-image, .col-span-1.w-full.overflow-hidden')];
+        clickedIndex = Math.max(0, slots.indexOf(slot));
+      }
+
+      // ← OPEN the overlay (this was the main bug!)
+      openOverlay(projectId, clickedIndex);
+    }, { once: false }); // ← Ensure listener persists
+  }
+
   function animateItems(row: HTMLElement, weights: number[]) {
     // Generate a key for this weight configuration to avoid redundant animations
     const weightsKey = `${allRows.indexOf(row)}-${weights.map(w => w.toFixed(2)).join(',')}`;
@@ -1389,4 +1772,6 @@ const projectsWithUrls = projects.map(project => ({
   });
 
   } // End of else block for DOM element check
+
+
 </script>

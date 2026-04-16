@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
-import { Font, type CssVariable } from "astro:assets";
+import { Font, type CssVariable, Picture } from "astro:assets";
+import headshot from "../assets/images/JAFINALHEADSHOT.jpg";
 
 export interface Props {
     title: string;
@@ -50,6 +51,26 @@ const FONTS: CssVariable[] = ["--font-sans"];
 
         </div>
         <slot />
+            <div class="h-50"></div>
+            <div class="h-screen min-h-220 grid! grid-cols-10! gap-gutter p-padding text-sm leading-[110%]">
+                <div class="col-span-5 h-full flex flex-col justify-center">
+                    <div class="grid w-full grid-cols-5 gap-gutter h-fit">
+                        <div class="col-span-2! flex flex-row items-start justify-start">
+                            <p class="text-nowrap">
+                                Director and Photographer Based in Toronto.<br/><span class="opacity-muted text-nowrap">info@justinabernethy.com</span>
+                            </p>
+                        </div>
+                        <div class="col-span-1  flex flex-row justify-end items-start">Instagram</div>
+                        <div class="col-span-1 flex flex-row justify-end items-start">Vimeo</div>
+                    </div>
+                </div>
+                <div class="col-span-5 flex flex-row justify-end items-end h-full">
+                    <div class="w-[75%]">
+                        <Picture src={headshot} alt="Justin Abernethy headshot" class="w-full h-auto"></Picture>
+                    </div>
+                </div>
+            </div>
+
         <script>
             import Lenis from 'lenis';
 

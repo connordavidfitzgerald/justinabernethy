@@ -126,3 +126,150 @@ mux-player {
   transform-origin: center center;
   will-change: transform;
 }
+
+.play-icon {
+}
+
+/* Make detail gallery images clearly clickable */
+#detail-image-gallery [id="detail-first-image"],
+#detail-image-gallery .col-span-1.w-full.overflow-hidden {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+#detail-image-gallery [id="detail-first-image"]:hover,
+#detail-image-gallery .col-span-1.w-full.overflow-hidden:hover {
+  opacity: 0.9;
+}
+/* Overlay base transitions */
+
+#single-view-overlay:not(.hidden) {
+  pointer-events: auto;
+}
+
+/* Navigation items - initial state for animation */
+.overlay-nav {
+  will-change: opacity;
+}
+
+/* Media container transition */
+#overlay-media-container {
+  will-change: opacity;
+}
+
+#overlay-exit {
+  transition: opacity 1s ease-out;
+}
+#overlay-exit:hover {
+  opacity: 1;
+}
+
+#overlay-prev,
+#overlay-next {
+  transition: opacity 0.2s ease-out;
+}
+#overlay-prev:hover,
+#overlay-next:hover {
+  opacity: 0.7;
+}
+
+/* Prevent layout shift during animation */
+#overlay-media-container img,
+#overlay-media-container mux-player {
+  max-width: 100%;
+  max-height: 100vh;
+  object-fit: contain;
+}
+
+/* Media Chrome Custom Theme */
+media-controller {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.controls-overlay {
+  position: absolute;
+  bottom: 20px; /* Adjust vertical position as needed */
+  left: 0;
+  right: 0;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  pointer-events: none; /* Allows click-through to video area */
+  z-index: 10;
+}
+
+.controls-overlay > * {
+  pointer-events: auto; /* Re-enable clicks for controls */
+}
+
+/* --- Buttons --- */
+media-play-button,
+media-fullscreen-button {
+  color: white;
+  font-family: ui-sans-serif, system-ui, sans-serif; /* font-sans */
+  font-size: 0.875rem; /* text-sm */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  mix-blend-mode: exclusion;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px; /* Hit area */
+}
+
+/* Hide default icons */
+media-play-button svg,
+media-fullscreen-button svg {
+  display: none;
+}
+
+/* Text Content Injection */
+/* Default state (Paused): PLAY */
+media-play-button::before {
+  content: "PLAY";
+}
+
+/* Playing state: PAUSE */
+media-play-button:not([media-paused])::before {
+  content: "PAUSE";
+}
+
+/* Fullscreen text */
+media-fullscreen-button::before {
+  content: "FULLSCREEN";
+}
+
+/* --- Progress Bar --- */
+media-time-range {
+  flex-grow: 1;
+  /* 1px line height (hit area is taller for usability) */
+  height: 20px;
+  mix-blend-mode: exclusion;
+  position: relative;
+  cursor: pointer;
+}
+
+/* Media Chrome CSS Variables for Slider Styling */
+media-time-range {
+  --media-range-track-height: 1px;
+  --media-range-track-background: rgba(255, 255, 255, 0.5); /* White line */
+  --media-range-thumb-width: 10px; /* 10px width for 5px radius */
+  --media-range-thumb-height: 10px;
+  --media-range-thumb-border-radius: 50%;
+  --media-range-thumb-background: white; /* White circle */
+  --media-range-thumb-transform: scale(1);
+  --media-range-thumb-transition: transform 0.1s;
+}
+
+/* Hover effect for the thumb */
+media-time-range:hover {
+  --media-range-thumb-transform: scale(1.5);
+}
