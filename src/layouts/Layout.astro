@@ -24,14 +24,85 @@ const FONTS: CssVariable[] = ["--font-sans"];
         <meta name="description" content={description} />
         {FONTS.map((font) => <Font cssVariable={font} preload />)}
         <title>{title}</title>
+
     </head>
-    <body class="min-h-screen var(--font-sans) uppercase">
+    <script is:inline>
+        // Blocking script to set theme before paint (prevents flash)
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    <body class="min-h-screen var(--font-sans) uppercase bg-theme text-theme">
         <div
-            class="fixed top-0 left-0 right-0 h-fit flex flex-row justify-between text-md px-1.5 z-50 text-black pt-1 pb-1 tracking-[-1%] bg-white"
+            class="fixed top-0 left-0 right-0 h-fit flex flex-row justify-between font-medium text-md px-padding z-10001 pt-padding pb-padding tracking-custom "
         >
-            <h3 class="">Justin Abernethy</h3>
-            <h3 class="">Information</h3>
+            <a href="/" class="">Justin Abernethy</a>
+            <div class="flex flex-row gap-40 justify-end ">
+                <div class="flex flex-row gap-padding text-md tracking-[-1%] justify-end">
+                    <h3 id="theme-light" class="cursor-pointer opacity-muted dark:opacity-100">LIGHT</h3>
+                    <h3 id="theme-dark" class="cursor-pointer opacity-100 dark:opacity-muted">DARK</h3>
+                </div>
+                <h3 class="">Information</h3>
+            </div>
+
         </div>
         <slot />
+        <script>
+            import Lenis from 'lenis';
+
+            // Initialize Lenis smooth scroll
+            const lenis = new Lenis({
+                duration: 0.8,
+                easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+                orientation: 'vertical',
+                smoothWheel: true,
+            });
+
+            // Animation frame loop for Lenis
+            function raf(time: number) {
+                lenis.raf(time);
+                requestAnimationFrame(raf);
+            }
+            requestAnimationFrame(raf);
+
+            // Expose lenis globally for other scripts to access if needed
+            (window as any).lenis = lenis;
+
+            // Theme toggle functionality
+            const root = document.documentElement;
+            const lightBtn = document.getElementById('theme-light');
+            const darkBtn = document.getElementById('theme-dark');
+
+            // Theme is already set by blocking script in <head>
+            // This just ensures the state is correct (no-op on initial load)
+
+            // Update button states
+            function updateButtonStates() {
+                const isDark = root.classList.contains('dark');
+                if (lightBtn && darkBtn) {
+                    lightBtn.style.opacity = isDark ? 'var(--opacity-muted)' : '1';
+                    darkBtn.style.opacity = isDark ? '1' : 'var(--opacity-muted)';
+                }
+            }
+            updateButtonStates();
+
+            // Toggle handlers
+            lightBtn?.addEventListener('click', () => {
+                root.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                updateButtonStates();
+                window.dispatchEvent(new CustomEvent('themechange', { detail: 'light' }));
+            });
+
+            darkBtn?.addEventListener('click', () => {
+                root.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                updateButtonStates();
+                window.dispatchEvent(new CustomEvent('themechange', { detail: 'dark' }));
+            });
+        </script>
     </body>
 </html>

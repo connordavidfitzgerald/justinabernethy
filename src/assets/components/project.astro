@@ -1,0 +1,189 @@
+---
+import { Picture } from "astro:assets";
+import { MuxPlayer } from "@mux/mux-player-astro";
+import pic1 from "../images/DIAMOND CAFE.jpg";
+import "../../styles/global.css";
+import { loadQuery } from "../../sanity/lib/loadQuery.ts";
+import { urlForImage } from "../../sanity/lib/url-for-image.ts";
+
+// Props for the current project being displayed
+interface Props {
+  currentProjectId?: string;
+  currentProjectName?: string;
+  currentProjectType?: string;
+}
+
+const { currentProjectId, currentProjectName = "Diamond Café", currentProjectType = "Campaign" } = Astro.props;
+
+// Fetch all projects from Sanity
+const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
+  _id,
+  name,
+  type,
+  index,
+  thumbnail,
+  muxID
+}`;
+
+const { data: projects } = await loadQuery({ query: PROJECTS_QUERY });
+---
+<div class="w-full flex">
+    <div class="grid grid-cols-10 gap-padding">
+        <div class="col-span-2 flex flex-col h-full min-h-screen">
+            <div class="sticky top-0 h-screen min-h-200 w-full flex flex-col justify-end pb-padding">
+                <!-- Project name - absolute centered -->
+                <div class="flex flex-col grow justify-end pb-padding text-sm uppercase tracking-custom leading-[105%] font-medium">
+                    <h2>{currentProjectName}</h2>
+                    <h2 class="opacity-muted">{currentProjectType}</h2>
+                </div>
+
+                <!-- Preview container - fixed 4/5 aspect ratio, 50% width -->
+                <div class="project-preview w-[75%] mb-padding">
+                    <div class="relative w-full" style="aspect-ratio: 4/5">
+                        <div class="grid absolute inset-0">
+                            {projects.map((project) => (
+                                <div
+                                    class="preview-item opacity-0 col-start-1 row-start-1 flex items-end"
+                                    data-preview-id={project._id}
+                                >
+                                    {project.muxID && !project.thumbnail?.asset ? (
+                                        <MuxPlayer
+                                            playbackId={project.muxID}
+                                            class="w-full object-cover aspect-video"
+                                            style={{ '--controls': 'none' }}
+                                            muted
+                                            loop
+                                        />
+                                    ) : project.thumbnail?.asset ? (
+                                        <img
+                                            src={`${urlForImage(project.thumbnail).url()}?auto=format`}
+                                            alt={project.name}
+                                            class="w-full object-cover"
+                                            style="aspect-ratio: 4/5"
+                                        />
+                                    ) : null}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project list -->
+                        <div class="project-list-container">
+                            <div class="project-list flex flex-col justify-end gap-0 text-sm uppercase tracking-custom leading-[115%] font-medium">
+                                {projects.map((project) => (
+                                    <div
+                                        class:list={[
+                                            "project-list-item flex flex-row gap-padding cursor-pointer opacity-muted",
+                                            { "!opacity-100": project._id === currentProjectId }
+                                        ]}
+                                        data-project-id={project._id}
+                                    >
+                                        <p class="min-w-4.5">{String(project.index).padStart(3, '0')}</p>
+                                        <p>{project.name}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+            </div>
+        </div>
+        <div class="col-span-8 flex flex-col gap-padding">
+            <div class="grid grid-cols-2 grid-flow-row gap-padding w-full ">
+                <div class="col-span-1 w-full overflow-hidden">
+                      <Picture src={pic1} alt="" class="w-full h-full object-cover"/>
+                </div>
+                <div class="col-span-1 w-full overflow-hidden">
+                      <Picture src={pic1} alt="" class="w-full h-full object-cover"/>
+                </div>
+                <div class="col-span-1 w-full overflow-hidden">
+                      <Picture src={pic1} alt="" class="w-full h-full object-cover"/>
+                </div>
+                <div class="col-span-1 w-full overflow-hidden">
+                      <Picture src={pic1} alt="" class="w-full h-full object-cover"/>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+  import gsap from 'gsap';
+
+  const DURATION = 0.4;
+  const EASE = 'power3.out';
+
+  // Helper to get theme-aware muted opacity
+  function getMutedOpacity(): number {
+    return document.documentElement.classList.contains('dark') ? 0.2 : 0.3;
+  }
+
+  const listContainer = document.querySelector('.project-list-container');
+  const listItems = document.querySelectorAll<HTMLElement>('.project-list-item');
+
+  let activeProjectId: string | null = null;
+  let activeListItem: HTMLElement | null = null;
+
+  function showPreview(projectId: string, listItem: HTMLElement) {
+    if (activeProjectId === projectId) return;
+
+    // Reset previous list item opacity
+    if (activeListItem) {
+      gsap.to(activeListItem, { opacity: getMutedOpacity(), duration: DURATION, ease: EASE });
+    }
+
+    // Hide previous preview
+    if (activeProjectId) {
+      const prevPreview = document.querySelector(`[data-preview-id="${activeProjectId}"]`) as HTMLElement;
+      if (prevPreview) {
+        gsap.to(prevPreview, { opacity: 0, duration: DURATION, ease: EASE });
+        const video = prevPreview.querySelector('mux-player') as HTMLElement & { pause: () => void };
+        if (video) video.pause();
+      }
+    }
+
+    activeProjectId = projectId;
+    activeListItem = listItem;
+
+    // Highlight current list item
+    gsap.to(listItem, { opacity: 1, duration: DURATION, ease: EASE });
+
+    // Show new preview
+    const newPreview = document.querySelector(`[data-preview-id="${projectId}"]`) as HTMLElement;
+    if (newPreview) {
+      gsap.to(newPreview, { opacity: 1, duration: DURATION, ease: EASE });
+      const video = newPreview.querySelector('mux-player') as HTMLElement & { play: () => void };
+      if (video) {
+        video.play();
+      }
+    }
+  }
+
+  function hidePreview() {
+    // Reset list item opacity
+    if (activeListItem) {
+      gsap.to(activeListItem, { opacity: getMutedOpacity(), duration: DURATION, ease: EASE });
+      activeListItem = null;
+    }
+
+    if (activeProjectId) {
+      const prevPreview = document.querySelector(`[data-preview-id="${activeProjectId}"]`) as HTMLElement;
+      if (prevPreview) {
+        gsap.to(prevPreview, { opacity: 0, duration: DURATION, ease: EASE });
+        const video = prevPreview.querySelector('mux-player') as HTMLElement & { pause: () => void };
+        if (video) video.pause();
+      }
+    }
+    activeProjectId = null;
+  }
+
+  // Attach event listeners
+  listItems.forEach((item) => {
+    const projectId = item.dataset.projectId;
+    if (!projectId) return;
+
+    item.addEventListener('mouseenter', () => showPreview(projectId, item));
+  });
+
+  listContainer?.addEventListener('mouseleave', hidePreview);
+</script>

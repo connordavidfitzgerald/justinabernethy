@@ -4,7 +4,6 @@ import Layout from '../layouts/Layout.astro';
 import { MuxPlayer } from '@mux/mux-player-astro';
 import { loadQuery } from '../sanity/lib/loadQuery.ts';
 import { urlForImage } from '../sanity/lib/url-for-image.ts';
-
 import { sanityClient } from 'sanity:client';
 
 const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
@@ -18,7 +17,6 @@ const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
 }`;
 
 const { data: projects } = await loadQuery({ query: PROJECTS_QUERY });
-console.log('projects:', projects);
 
 const ROW_SIZE = 5;
 
@@ -31,19 +29,52 @@ const rows = Array.from({ length: Math.ceil(projects.length / ROW_SIZE) }, (_, i
 function getAspect(project: (typeof projects)[number]): number {
   return project.muxID && !project.thumbnail?.asset ? 9 / 16 : 7 / 5;
 }
+
+// Pre-compute all image URLs for client-side use
+const projectsWithUrls = projects.map(project => ({
+  ...project,
+  thumbnailUrl: project.thumbnail?.asset ? `${urlForImage(project.thumbnail).url()}?auto=format` : null,
+  galleryUrls: project.imageGallery?.filter((img: any) => img?.asset).map((img: any) => ({
+    url: `${urlForImage(img).url()}?auto=format`,
+    _key: img._key
+  })) || []
+}));
 ---
 
-<Layout>
-  <main class="p-1.5 bg-white text-black">
-    <section class="">
+<style>
+  /* GPU optimization hints for frequently animated elements */
+  .gallery-row-wrapper {
+    will-change: transform;
+    contain: layout style;
+  }
+  .gallery-item {
+    will-change: flex-grow;
+    contain: layout style;
+  }
+  .gallery-item-cover {
+    will-change: transform;
+  }
+  .preview-item {
+    will-change: opacity;
+  }
+  /* Reduce paint areas */
+  #gallery-container {
+    contain: layout style;
+  }
+</style>
+
+<Layout title="Justin Abernethy">
+  <main class="p-padding bg-theme text-theme">
+    <section class="relative">
       {projects.length === 0 && <p class="text-gray-400">No projects found.</p>}
 
-      <div id="gallery-container" class="flex flex-col gap-3">
+      <!-- Gallery Container -->
+      <div id="gallery-container" class="flex flex-col gap-0">
         {
           rows.map((row, rowIndex) => (
             <div class="gallery-row-wrapper relative" data-wrapper={rowIndex}>
               <div
-                class="gallery-row absolute inset-x-0 bottom-0 flex gap-1.5 items-end"
+                class="gallery-row absolute inset-x-0 bottom-0 flex gap-0 items-end"
                 data-row={rowIndex}
               >
                 {row.map((project, projectIndex) => {
@@ -51,12 +82,16 @@ function getAspect(project: (typeof projects)[number]): number {
                   const globalIndex = rowIndex * ROW_SIZE + projectIndex;
                   return (
                     <div
-                      class="gallery-item flex flex-col gap-1.5 min-w-0"
+                      class="gallery-item flex flex-col gap-padding min-w-0 px-padding-half cursor-pointer relative overflow-hidden"
                       style="flex: 1 1 0%"
                       data-aspect={aspect}
                       data-row={rowIndex}
                       data-global-index={globalIndex}
+                      data-project-id={project._id}
                     >
+                      {/* Cover overlay for animation */}
+                      <div class="gallery-item-cover absolute -inset-1 bg-theme z-10 pointer-events-none" style="transform: translateY(100%)"></div>
+
                       {project.muxID && !project.thumbnail?.asset ? (
                         <MuxPlayer
                           playbackId={project.muxID}
@@ -64,28 +99,24 @@ function getAspect(project: (typeof projects)[number]): number {
                           style={{ '--controls': 'none' }}
                           muted
                           loop
+                          data-flip-id={`media-${project._id}`}
                         />
                       ) : (
                         <img
-                        src={`${urlForImage(project.thumbnail).url()}?auto=format`}
+                          src={`${urlForImage(project.thumbnail).url()}?auto=format`}
                           alt={project.name}
                           class="item-media w-full object-cover"
                           style="aspect-ratio: 5/7"
+                          data-flip-id={`media-${project._id}`}
                         />
                       )}
-                      <div class="item-name-type flex flex-row justify-between w-full">
-                        <div class="absolute z-0 mt-0 w-fit h-full flex flex-col gap-0 project-title">
-                          <h3 class="text-sm leading-[100%] tracking-[-1%]">{project.name}</h3>
-                          <h3 class="text-sm leading-[100%] tracking-[-1%] opacity-0">{project.type}</h3>
+                      <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-medium -mt-0.5 pb-padding">
+                        <div class="absolute z-0 mt-0 h-full flex flex-col gap-0 project-title">
+                          <h3 class="text-sm leading-[100%] tracking-custom whitespace-nowrap">{project.name}</h3>
                         </div>
-                        <div class="absolute z-1 mt-0 ml-0 mr-0 h-full w-full ">
-
-                        </div>
+                        <div class="title-fade-overlay absolute inset-0 h-full w-full z-1 pointer-events-none opacity-0 gradient-fade"></div>
                         <div class="flex flex-col gap-0 items-end grow z-2">
-                          <p class="text-sm leading-[100%] tracking-[-1%] flex">{project.index}</p>
-                          <p class="text-sm leading-[100%] flex opacity-0 -z-10">
-                            {project.index}
-                          </p>
+                          <p class="text-sm leading-[100%] tracking-custom flex">{project.index}</p>
                         </div>
                       </div>
                     </div>
@@ -96,35 +127,1056 @@ function getAspect(project: (typeof projects)[number]): number {
           ))
         }
       </div>
+
+      <!-- Project Detail Section (hidden initially, in document flow) -->
+      <div id="project-detail" class="hidden z-20">
+        <div class="w-full flex pb-padding">
+          <div class="grid grid-cols-10 gap-padding w-full">
+            <!-- Left Sidebar -->
+            <div class="col-span-2 flex flex-col h-full min-h-screen">
+              <div class="sticky top-0 h-screen min-h-200 w-full flex flex-col justify-end pb-padding">
+                <!-- Project name -->
+                <div class="flex flex-col grow justify-end pb-padding text-sm uppercase tracking-custom leading-[105%] font-medium">
+                  <h2 id="detail-project-name"></h2>
+                  <h2 id="detail-project-type" class="opacity-muted"></h2>
+                </div>
+
+                <!-- Preview container -->
+                <div class="project-preview w-[75%] mb-padding">
+                  <div class="relative w-full" style="aspect-ratio: 4/5">
+                    <div class="grid absolute inset-0" id="detail-preview-grid">
+                      {projectsWithUrls.map((project) => (
+                        <div
+                          class="preview-item opacity-0 col-start-1 row-start-1 flex items-end"
+                          data-preview-id={project._id}
+                        >
+                          {project.muxID && !project.thumbnailUrl ? (
+                            <MuxPlayer
+                              playbackId={project.muxID}
+                              class="w-full object-cover aspect-video"
+                              style={{ '--controls': 'none' }}
+                              muted
+                              loop
+                            />
+                          ) : project.thumbnailUrl ? (
+                            <img
+                              src={project.thumbnailUrl}
+                              alt={project.name}
+                              class="w-full object-cover"
+                              style="aspect-ratio: 4/5"
+                            />
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Project list -->
+                <div id="project-list-container" class="project-list-container">
+                  <div class="project-list flex flex-col justify-end gap-0 text-sm uppercase tracking-custom leading-[115%] font-medium">
+                    {projectsWithUrls.map((project) => (
+                      <div
+                        class="detail-list-item flex flex-row gap-padding cursor-pointer opacity-muted"
+                        data-project-id={project._id}
+                      >
+                        <p class="min-w-4.5">{String(project.index).padStart(3, '0')}</p>
+                        <p>{project.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Content - Image Gallery -->
+            <div class="col-span-8 flex flex-col gap-padding">
+              <div id="detail-image-gallery" class="grid grid-cols-2 grid-flow-row gap-padding w-full">
+                <!-- Images will be populated dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="h-[200vh] w-full"></div>
+
     </section>
   </main>
 </Layout>
 
+<!-- Pass project data to client -->
+<script define:vars={{ projectsWithUrls, ROW_SIZE }}>
+  window.__PROJECTS_DATA__ = projectsWithUrls;
+  window.__ROW_SIZE__ = ROW_SIZE;
+</script>
+
 <script>
   import gsap from 'gsap';
 
-  const FALLOFF = 0.65;
-  const ITEM_GAP_PX = 5;
-  const DURATION = 0.7;
-  const EASE = 'power3.out';
-  const LEAVE_DELAY = 0;
 
+  // ─── Constants ─────────────────────────────────────────────────────────────
+  const FALLOFF = 0.8;
+  const ITEM_GAP_PX = 8;
+  const DURATION = 0.5;
+  const DURATION_ALT = 0.5;
+  const EASE = 'power3.out';
+  const COVER_DURATION = 1.2;
+  const COVER_STAGGER_WINDOW = 0.8; // Total time window for all staggers
+  const COVER_STAGGER_CURVE = 1.5; // Power curve (<1 = ramps down, items bunch at end)
+  const FLIP_DURATION = 0.6;
+  const SETTLE_DURATION = 0.6; // Duration for hover animations to settle before capturing
+
+  const MOVE_DURATION = 1.2;
+  const MOVE_DELAY = 0.7;
+
+  const VERTICAL_THRESHOLD = 0.85;
+  const INTENSITY_MULTIPLIER = 1;
+  const CURVE_POWER = 1;
+  // Helper to get theme-aware muted opacity
+  function getMutedOpacity(): number {
+    return document.documentElement.classList.contains('dark') ? 0.2 : 0.3;
+  }
+
+  // ─── Performance Utilities ─────────────────────────────────────────────────
+  function throttleRAF<T extends (...args: any[]) => void>(fn: T): T {
+    let rafId: number | null = null;
+    let lastArgs: Parameters<T> | null = null;
+
+    const throttled = (...args: Parameters<T>) => {
+      lastArgs = args;
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          if (lastArgs) fn(...lastArgs);
+        });
+      }
+    };
+
+    return throttled as T;
+  }
+
+  // ─── DOM Elements ──────────────────────────────────────────────────────────
   const container = document.getElementById('gallery-container')!;
+  const projectDetail = document.getElementById('project-detail')!;
+  const projectListContainer = document.getElementById('project-list-container')!;
+  const detailProjectName = document.getElementById('detail-project-name')!;
+  const detailProjectType = document.getElementById('detail-project-type')!;
+  const detailImageGallery = document.getElementById('detail-image-gallery');
+
+  // Early exit if essential elements don't exist
+  if (!container || !projectDetail || !detailProjectName || !detailProjectType || !detailImageGallery) {
+    console.error('Missing essential DOM elements');
+  } else {
+  // Main script wrapped in else block to prevent execution when elements are missing
+
   const allWrappers = [...container.querySelectorAll<HTMLElement>('.gallery-row-wrapper')];
   const allRows = [...container.querySelectorAll<HTMLElement>('.gallery-row')];
+  const allItems = [...container.querySelectorAll<HTMLElement>('.gallery-item')];
 
-  let activeRow: HTMLElement | null = null;
+  // ─── State ─────────────────────────────────────────────────────────────────
   let activeRowIndex: number = -1;
-  let leaveTimer: gsap.core.Tween | null = null;
-  let aboveTimer: gsap.core.Tween | null = null;
+  let isProjectOpen = false;
+  let isAnimating = false; // Block hover updates during open/close animations
+  let currentProjectId: string | null = null;
+  let clickedRowIndex: number = -1;
+  let savedMaxDelta: number = 0;
 
-  // Tracks which opposite-edge item is currently faded, per row
-  const fadedEdge = new Map<HTMLElement, HTMLElement | null>();
+  const fadedEdge = new Map<HTMLElement, HTMLElement[] | null>();
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+
+  // ─── Cached Data ───────────────────────────────────────────────────────────
+  // Cache items per row to avoid repeated DOM queries
+  const rowItemsCache = new Map<HTMLElement, HTMLElement[]>();
+  const itemAspectsCache = new Map<HTMLElement, number>();
+
+  // Pre-cache row items and aspects
+  allRows.forEach(row => {
+    const items = [...row.querySelectorAll<HTMLElement>('.gallery-item')];
+    rowItemsCache.set(row, items);
+    items.forEach(item => {
+      itemAspectsCache.set(item, parseFloat(item.dataset.aspect || '1'));
+    });
+  });
+
+  // Cache preview elements for sidebar
+  const previewCache = new Map<string, HTMLElement>();
+  document.querySelectorAll<HTMLElement>('#detail-preview-grid [data-preview-id]').forEach(el => {
+    const id = el.dataset.previewId;
+    if (id) previewCache.set(id, el);
+  });
+
+  // Track last animated state to avoid redundant animations
+  let lastTargetRowIndex = -1;
+  let lastWeightsKey = '';
+
+  // Get project data from window
+  const projectsData = (window as any).__PROJECTS_DATA__ as any[] || [];
+  const ROW_SIZE = (window as any).__ROW_SIZE__ as number || 5;
+
+  // ─── Project Detail Functions ──────────────────────────────────────────────
+
+  function getProjectById(id: string) {
+    return projectsData.find(p => p._id === id);
+  }
+
+  function populateProjectDetail(project: any) {
+    // Set project name and type
+    detailProjectName.textContent = project.name;
+    detailProjectType.textContent = project.type || '';
+
+    // Clear existing gallery
+    detailImageGallery.innerHTML = '';
+
+    // Add first image slot (will be populated by FLIP animation target)
+    const firstSlot = document.createElement('div');
+    firstSlot.className = 'col-span-1 w-full overflow-visible';
+    firstSlot.id = 'detail-first-image';
+
+    if (project.muxID && !project.thumbnailUrl) {
+      firstSlot.innerHTML = `
+        <mux-player
+          playback-id="${project.muxID}"
+          class="w-full object-cover aspect-video"
+          style="--controls: none"
+          muted
+          loop
+          data-flip-id="media-${project._id}"
+        ></mux-player>
+      `;
+    } else if (project.thumbnailUrl) {
+      firstSlot.innerHTML = `
+        <img
+          src="${project.thumbnailUrl}"
+          alt="${project.name}"
+          class="w-full h-full object-cover"
+          style="aspect-ratio: 5/7"
+          data-flip-id="media-${project._id}"
+        />
+      `;
+    }
+    detailImageGallery.appendChild(firstSlot);
+
+    // Add gallery images with cover overlays for reveal animation
+    if (project.galleryUrls && project.galleryUrls.length > 0) {
+      project.galleryUrls.forEach((img: any) => {
+        const slot = document.createElement('div');
+        slot.className = 'col-span-1 w-full overflow-hidden relative';
+        slot.innerHTML = `
+          <img
+            src="${img.url}"
+            alt="${project.name}"
+            class="w-full h-full object-cover"
+            style="aspect-ratio: 5/7"
+          />
+          <div class="gallery-image-cover absolute inset-0 bg-theme z-10 pointer-events-none"></div>
+        `;
+        detailImageGallery.appendChild(slot);
+      });
+    }
+
+    // Update active state in sidebar list
+    document.querySelectorAll('.detail-list-item').forEach(item => {
+      const itemId = (item as HTMLElement).dataset.projectId;
+      if (itemId === project._id) {
+        gsap.to(item, { opacity: 1});
+      } else {
+        gsap.to(item, { opacity: getMutedOpacity()});
+      }
+    });
+  }
+
+  function openProject(projectId: string, clickedItem: HTMLElement) {
+    if (isProjectOpen || isAnimating) return;
+
+    const project = getProjectById(projectId);
+    if (!project) return;
+
+    isProjectOpen = true;
+    isAnimating = true; // Block hover updates during animation
+    currentProjectId = projectId;
+    clickedRowIndex = parseInt(clickedItem.dataset.row || '0');
+
+    // Populate project detail (but keep it hidden for now)
+    populateProjectDetail(project);
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STAGE 0: Settle hover animations before capturing position
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Create a timeline to settle all hover animations
+    const settleTl = gsap.timeline({
+      onComplete: () => {
+        // Now that everything is settled, capture position and start the main animation
+        startOpenAnimation(projectId, clickedItem, project);
+      }
+    });
+
+    // Animate all items back to rest state (flexGrow: 1)
+    allRows.forEach(row => {
+      row.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
+        settleTl.to(item, {
+          flexGrow: 1,
+          duration: SETTLE_DURATION,
+          ease: 'power2.out',
+          overwrite: true
+        }, 0);
+      });
+    });
+
+    // Animate all wrappers back to rest state (y: 0)
+    allWrappers.forEach((wrapper) => {
+      settleTl.to(wrapper, {
+        y: 0,
+        duration: SETTLE_DURATION,
+        ease: 'power2.out',
+        overwrite: true
+      }, 0);
+    });
+  }
+
+  function startOpenAnimation(projectId: string, clickedItem: HTMLElement, project: any) {
+    // Disable sidebar pointer events during animation
+    projectListContainer.style.pointerEvents = 'none';
+
+    // Get clicked item's media element and capture its position AFTER settling
+    const clickedMedia = clickedItem.querySelector('.item-media') as HTMLElement;
+    const clickedRect = clickedMedia.getBoundingClientRect();
+    const clickedCaption = clickedItem.querySelector('.item-name-type') as HTMLElement;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STAGE 1: Create fixed clone, animate covers on other items
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Create a fixed-position clone of the clicked media
+    // This stays in place visually while we manipulate the DOM and scroll
+
+    if (clickedCaption) clickedCaption.style.visibility = 'hidden';
+    // Hide the original clicked media (clone is now visible in its place)
+
+
+    const clone = clickedMedia.cloneNode(true) as HTMLElement;
+    clone.id = 'transition-clone';
+    clone.style.cssText = `
+      position: fixed;
+      top: ${clickedRect.top}px;
+      left: ${clickedRect.left}px;
+      width: ${clickedRect.width}px;
+      height: ${clickedRect.height}px;
+      z-index: 9999;
+      pointer-events: none;
+      object-fit: cover;
+    `;
+    document.body.appendChild(clone);
+    clickedMedia.style.visibility = 'hidden';
+
+    // Get ALL items except clicked one to cover during Stage 1
+    // Disable pointer events on clicked item to prevent hover interference during animation
+    clickedItem.style.pointerEvents = 'none';
+
+    const clickedGlobalIndex = parseInt(clickedItem.dataset.globalIndex || '0');
+
+    // Only animate items that are visible in the viewport
+    const viewportHeight = window.innerHeight;
+    const viewportTop = 0;
+    const viewportBottom = viewportHeight;
+
+    const itemsToHide = allItems
+      .filter(item => {
+        const rect = item.getBoundingClientRect();
+        // Item is visible if it overlaps with the viewport
+        return rect.bottom > viewportTop && rect.top < viewportBottom;
+      })
+      .map(item => ({
+        item,
+        distance: Math.abs(parseInt(item.dataset.globalIndex || '0') - clickedGlobalIndex)
+      }))
+      .sort(() => Math.random() - 0.5);
+
+    // Animate covers on other items (exponentially decreasing stagger)
+    const tl = gsap.timeline();
+    const totalItems = itemsToHide.length;
+
+    itemsToHide.forEach(({ item }, index) => {
+      const cover = item.querySelector('.gallery-item-cover') as HTMLElement;
+      if (!cover) return;
+
+      // Get the actual pixel height of the cover for precise animation
+      const coverHeight = cover.offsetHeight;
+
+      // Immediately set cover to starting position (below the item)
+      gsap.set(cover, { y: coverHeight, immediateRender: true, overwrite: true });
+
+      // Calculate exponential stagger delay (ramps down so items bunch together at end)
+      // Using power curve: delay = window * (normalizedIndex ^ curve)
+      const normalizedIndex = totalItems > 1 ? index / (totalItems - 1) : 0;
+      const staggerDelay = COVER_STAGGER_WINDOW * Math.pow(normalizedIndex, COVER_STAGGER_CURVE);
+
+      // Animate cover sliding up to cover the image
+      tl.to(cover, {
+        y: 0,
+        duration: COVER_DURATION,
+        ease: "power3.in",
+        overwrite: 'auto'
+      }, staggerDelay);
+    });
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STAGE 2: After covers complete, set up layout and animate clone to target
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    tl.call(() => {
+      // Check if clicked row is the last row
+      const isLastRow = clickedRowIndex === allWrappers.length - 1;
+
+      // Hide rows up to and including clicked row (unless it's the last row - then show all)
+      if (!isLastRow) {
+        for (let i = 0; i <= clickedRowIndex; i++) {
+          allWrappers[i].style.display = 'none';
+        }
+      }
+
+      // Remove covers from visible rows
+      // If last row clicked, remove covers from ALL rows; otherwise only rows below
+      const firstVisibleRow = isLastRow ? 0 : clickedRowIndex + 1;
+      for (let i = firstVisibleRow; i < allWrappers.length; i++) {
+        allWrappers[i].querySelectorAll('.gallery-item-cover').forEach(cover => {
+          gsap.set(cover, { y: '100%' });
+        });
+      }
+
+      // Calculate the same spacing used for hover (maxDelta + 20)
+      const deltas = allWrappers.map((_, i) => calcMaxDelta(i)).filter(d => isFinite(d) && !isNaN(d));
+      savedMaxDelta = deltas.length > 0 ? Math.max(...deltas) : 0;
+
+      // Add margin-top to container to create spacing below project detail
+      gsap.set(container, { y: 0, marginTop: savedMaxDelta*2});
+
+      // Move project detail BEFORE the gallery container
+      container.parentElement?.insertBefore(projectDetail, container);
+
+      // Show project detail with fade-in
+
+      gsap.set(projectListContainer, { opacity: 0 });
+      projectDetail.classList.remove('hidden');
+
+      // Instantly scroll to top - INVISIBLE because clone is fixed in viewport
+      window.scrollTo(0, 0);
+
+
+      // Force layout reflow so target element has computed dimensions
+      void projectDetail.offsetHeight;
+
+      // Get target media position (now that we're scrolled to top, this is accurate)
+      const targetMedia = document.querySelector('#detail-first-image img, #detail-first-image mux-player') as HTMLElement;
+
+      if (targetMedia) {
+        // Don't hide target - let clone (z-index 9999) sit on top of it
+        // Target is visible underneath, so when clone is removed, there's no flash
+
+        const targetRect = targetMedia.getBoundingClientRect();
+        // Hide target initially (clone will animate to its position)
+        targetMedia.style.visibility = 'hidden';
+        // Animation parameters
+
+
+        // Calculate scale factors
+        const scaleX = clickedRect.width / targetRect.width;
+        const scaleY = clickedRect.height / targetRect.height;
+
+        // Animate clone from its current fixed position to target position
+        gsap.to(clone, {
+          top: targetRect.top,
+          left: targetRect.left,
+          width: targetRect.width,
+          height: targetRect.height,
+          delay: MOVE_DELAY,
+          duration: MOVE_DURATION,
+          ease: "power3.out",
+          onComplete: () => {
+            // Just remove the clone - target is already visible underneath
+            clone.remove();
+            targetMedia.style.visibility = 'visible';
+          }
+        });
+
+
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // STAGE 3: Reveal project detail elements and remove covers from rows below
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Reveal gallery images by sliding covers up
+        const galleryCovers = detailImageGallery.querySelectorAll('.gallery-image-cover');
+        gsap.fromTo(galleryCovers,
+          { y: 0 },
+          { y: '-100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: MOVE_DURATION +0.4}
+        );
+
+        // Remove covers from rows below (they were never covered, but ensure they're revealed)
+        for (let i = clickedRowIndex + 1; i < allWrappers.length; i++) {
+          allWrappers[i].querySelectorAll('.gallery-item-cover').forEach(cover => {
+            gsap.set(cover, { y: '100%' });
+          });
+        }
+
+        gsap.fromTo(detailProjectName, { opacity: 0 }, { opacity: 1, duration: 2, delay: 1, ease: "power2.out"});
+        gsap.fromTo(detailProjectType, { opacity: 0 }, { opacity: getMutedOpacity(), duration: 2, delay: 1.1, ease: "power2.out"});
+        gsap.fromTo(projectListContainer, { opacity: 0 }, { opacity: 1, duration: 2, delay: 1.2, ease: "power2.out", onComplete: () => {
+          // Re-enable sidebar pointer events after animation completes
+           projectListContainer.style.pointerEvents = 'auto';
+        }});
+        // Re-enable hover updates after animation completes
+        isAnimating = false;
+
+        // Setup scroll observer AFTER all DOM changes are complete
+        setupScrollObserver();
+      } else {
+        // Fallback: just remove clone
+        clone.remove();
+        isAnimating = false;
+        setupScrollObserver();
+      }
+    });
+  }
+
+  function closeProject(instant = true) {
+    if (!isProjectOpen) return;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SEAMLESS CLOSE: Keep visible content stable, reset everything above viewport
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Stop Lenis to prevent smooth scroll interference during close
+    const lenis = (window as any).lenis;
+    if (lenis) lenis.stop();
+
+    // Find the first visible row (the one the user is looking at)
+    // If last row was clicked, all rows are visible starting from 0
+    const isLastRow = clickedRowIndex === allWrappers.length - 1;
+    const firstVisibleIndex = isLastRow ? 0 : clickedRowIndex + 1;
+    const firstVisibleWrapper = allWrappers[firstVisibleIndex];
+
+    // Capture the current visual position of the first visible row
+    const anchorRect = firstVisibleWrapper?.getBoundingClientRect();
+    const anchorTop = anchorRect?.top ?? 0;
+
+    // Now do all the resets
+    isProjectOpen = false;
+    isAnimating = false;
+    currentProjectId = null;
+
+    // Clean up scroll observer
+    cleanupScrollObserver();
+
+    // Hide project detail instantly (it's above viewport anyway)
+    projectDetail.classList.add('hidden');
+
+    // Move project detail back to after the gallery container
+    container.parentElement?.insertBefore(projectDetail, container.nextSibling);
+
+    // Show all rows and reset visibility
+    // Reset only previously hidden rows (0 to clickedRowIndex) to avoid affecting visible content
+    const hiddenRowEnd = firstVisibleIndex;
+
+    allWrappers.forEach((wrapper, i) => {
+      wrapper.style.display = '';
+      wrapper.style.visibility = '';
+
+      // Reset y transform for ALL wrappers to ensure consistent state
+      gsap.set(wrapper, { y: 0 });
+    });
+
+    // Reset flexGrow only for previously hidden rows
+    for (let i = 0; i < hiddenRowEnd; i++) {
+      allRows[i].querySelectorAll<HTMLElement>('.gallery-item').forEach(item => {
+        gsap.set(item, { flexGrow: 1 });
+      });
+    }
+
+    // Reset all covers instantly
+    allItems.forEach(item => {
+      const cover = item.querySelector('.gallery-item-cover') as HTMLElement;
+      gsap.set(cover, { y: '100%' });
+    });
+
+    // Reset container margin and restore original y offset for hover
+    // Use savedMaxDelta to ensure consistency with open state
+    gsap.set(container, { marginTop: 0, y: savedMaxDelta + 20 });
+
+    // Reset clicked item visibility and pointer-events (including media and caption)
+    allItems.forEach(item => {
+      item.style.visibility = '';
+      item.style.pointerEvents = '';
+      const media = item.querySelector('.item-media') as HTMLElement;
+      if (media) media.style.visibility = '';
+      const caption = item.querySelector('.item-name-type') as HTMLElement;
+      if (caption) caption.style.visibility = '';
+    });
+
+    // Reset hover state (don't call init() - it would reset flexGrow and recalculate heights causing visual jumps)
+    clickedRowIndex = -1;
+    activeRowIndex = -1;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SCROLL COMPENSATION: Adjust scroll so visible content stays in place
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    if (firstVisibleWrapper) {
+      // Force layout recalculation
+      void firstVisibleWrapper.offsetHeight;
+
+      // Get the new position after all resets
+      const newRect = firstVisibleWrapper.getBoundingClientRect();
+      const newTop = newRect.top;
+
+      // Calculate how much the content shifted
+      const shift = newTop - anchorTop;
+
+      // Compensate by adjusting scroll position (instant, no animation)
+      if (Math.abs(shift) > 1) {
+        // Use native scroll since Lenis is stopped
+        window.scrollTo({ top: window.scrollY + shift, behavior: 'instant' });
+      }
+    }
+
+    // Resume Lenis after scroll compensation
+    if (lenis) {
+      // Small delay to ensure DOM has settled before resuming smooth scroll
+      requestAnimationFrame(() => {
+        lenis.start();
+      });
+    }
+  }
+
+  function transitionToProject(newProjectId: string) {
+    if (newProjectId === currentProjectId) return;
+
+    const project = getProjectById(newProjectId);
+    if (!project) return;
+
+    currentProjectId = newProjectId;
+
+    // Fade out current gallery
+    gsap.to(detailImageGallery.children, {
+      opacity: 0,
+      duration: DURATION_ALT * 0.5,
+      ease: EASE,
+      onComplete: () => {
+        // Populate new project
+        populateProjectDetail(project);
+
+        // Fade in new gallery
+        gsap.fromTo(detailImageGallery.children,
+          { opacity: 0, y: 10 },
+          { opacity: 1, y: 0, duration: DURATION, ease: EASE, stagger: 0.03 }
+        );
+      }
+    });
+  }
+
+  // ─── Scroll Observer ───────────────────────────────────────────────────────
+
+  let scrollObserver: IntersectionObserver | null = null;
+  let scrollHandler: (() => void) | null = null;
+
+  function setupScrollObserver() {
+    if (scrollObserver) {
+      scrollObserver.disconnect();
+    }
+    if (scrollHandler) {
+      window.removeEventListener('scroll', scrollHandler);
+    }
+
+    // Get the first visible row wrapper
+    // If last row was clicked, all rows are visible starting from 0
+    const isLastRow = clickedRowIndex === allWrappers.length - 1;
+    const firstVisibleIndex = isLastRow ? 0 : clickedRowIndex + 1;
+    const firstVisibleWrapper = allWrappers[firstVisibleIndex];
+
+    // If no visible rows below, no need for observer
+    if (!firstVisibleWrapper) return;
+
+    // IntersectionObserver for primary detection
+    // Observe the first visible row wrapper for more reliable detection
+    scrollObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        // Close when the bottom of the first visible row reaches the top of the viewport
+        if (isProjectOpen && entry.boundingClientRect.top <= 0) {
+          closeProject(true);
+        }
+      });
+    }, {
+      threshold: [0, 0.1, 0.25, 0.5], // Multiple thresholds for better detection
+      rootMargin: '0px 0px 0px 0px'
+    });
+
+    scrollObserver.observe(firstVisibleWrapper);
+
+    // Scroll listener as backup (checks on every scroll)
+    scrollHandler = () => {
+      if (!isProjectOpen) return;
+      // Close when the bottom of the first visible row reaches the top of the viewport
+      const wrapperRect = firstVisibleWrapper.getBoundingClientRect();
+      if (wrapperRect.bottom <= 0) {
+        closeProject(true);
+      }
+    };
+
+    window.addEventListener('scroll', scrollHandler, { passive: true });
+  }
+
+  function cleanupScrollObserver() {
+    if (scrollObserver) {
+      scrollObserver.disconnect();
+      scrollObserver = null;
+    }
+    if (scrollHandler) {
+      window.removeEventListener('scroll', scrollHandler);
+      scrollHandler = null;
+    }
+  }
+
+  // ─── Event Handlers ────────────────────────────────────────────────────────
+
+  // Throttled mouse handler using RAF
+  const handleMouseMove = throttleRAF((e: MouseEvent) => {
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    updateHoverAtPoint(e.clientX, e.clientY);
+  });
+
+  // Gallery item click handlers
+  allItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const projectId = item.dataset.projectId;
+      if (!projectId) return;
+
+      if (!isProjectOpen) {
+        openProject(projectId, item);
+      } else {
+        // If project is open, check if clicked item is in a visible row (below current project's row)
+        const itemRow = parseInt(item.dataset.row || '0');
+        if (itemRow > clickedRowIndex) {
+          // Close current project and open the new one
+          closeProject(true);
+          // Small delay to let close complete before opening new project
+          setTimeout(() => {
+            openProject(projectId, item);
+          }, 50);
+        }
+      }
+    });
+  });
+
+  // Sidebar list click handlers
+  document.querySelectorAll('.detail-list-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const projectId = (item as HTMLElement).dataset.projectId;
+      if (projectId) {
+        transitionToProject(projectId);
+      }
+    });
+
+    // Hover preview in sidebar
+    item.addEventListener('mouseenter', () => {
+      const projectId = (item as HTMLElement).dataset.projectId;
+      if (projectId) showSidebarPreview(projectId, item as HTMLElement);
+    });
+  });
+
+  document.querySelector('.project-list-container')?.addEventListener('mouseleave', hideSidebarPreview);
+
+  // ─── Sidebar Preview Functions ─────────────────────────────────────────────
+
+  let activeSidebarPreviewId: string | null = null;
+  let activeSidebarListItem: HTMLElement | null = null;
+
+  function showSidebarPreview(projectId: string, listItem: HTMLElement) {
+    if (activeSidebarPreviewId === projectId) return;
+
+    // Reset previous list item opacity (but keep current project highlighted)
+    if (activeSidebarListItem && activeSidebarListItem.dataset.projectId !== currentProjectId) {
+      gsap.to(activeSidebarListItem, { opacity: getMutedOpacity()});
+    }
+
+    // Hide previous preview (use cache instead of querySelector)
+    if (activeSidebarPreviewId) {
+      const prevPreview = previewCache.get(activeSidebarPreviewId);
+      if (prevPreview) {
+        gsap.to(prevPreview, { opacity: 0,duration: 0.01 });
+        const video = prevPreview.querySelector('mux-player') as HTMLElement & { pause: () => void };
+        if (video) video.pause();
+      }
+    }
+
+    activeSidebarPreviewId = projectId;
+    activeSidebarListItem = listItem;
+
+    // Highlight current list item
+    gsap.to(listItem, { opacity: 1, duration: 0.4, ease: EASE });
+
+    // Show new preview (use cache)
+    const newPreview = previewCache.get(projectId);
+    if (newPreview) {
+      gsap.to(newPreview, { opacity: 1, duration: 0.01});
+      const video = newPreview.querySelector('mux-player') as HTMLElement & { play: () => void };
+      if (video) video.play();
+    }
+  }
+
+  function hideSidebarPreview() {
+    // Reset list item opacity (but keep current project highlighted)
+    if (activeSidebarListItem && activeSidebarListItem.dataset.projectId !== currentProjectId) {
+      gsap.to(activeSidebarListItem, { opacity: getMutedOpacity()});
+    }
+    activeSidebarListItem = null;
+
+    if (activeSidebarPreviewId) {
+      const prevPreview = previewCache.get(activeSidebarPreviewId);
+      if (prevPreview) {
+        gsap.to(prevPreview, { opacity: 0 });
+        const video = prevPreview.querySelector('mux-player') as HTMLElement & { pause: () => void };
+        if (video) video.pause();
+      }
+    }
+    activeSidebarPreviewId = null;
+  }
+
+  // ─── Original Hover Logic ──────────────────────────────────────────────────
+
+  window.addEventListener('mousemove', handleMouseMove);
+
+  // Throttled scroll handler
+  const handleScroll = throttleRAF(() => {
+    if (lastMouseX === 0 && lastMouseY === 0) return;
+    updateHoverAtPoint(lastMouseX, lastMouseY);
+  });
+  window.addEventListener('scroll', handleScroll, { passive: true });
+
+  function resetAll() {
+    if (activeRowIndex === -1) return;
+
+    // Determine the first visible index for reset logic (handles last-row-open case)
+    const firstVisibleIndex = isProjectOpen && clickedRowIndex >= allWrappers.length - 1 ? 0 : (isProjectOpen ? clickedRowIndex + 1 : 0);
+    allRows.forEach((row, i) => {
+      // Skip hidden rows when project is open
+      if (isProjectOpen && i < firstVisibleIndex) return;
+      resetRow(row);
+    });
+    activeRowIndex = -1;
+
+    allWrappers.forEach((wrp, i) => {
+      // Skip hidden wrappers when project is open
+      if (isProjectOpen && i < firstVisibleIndex) return;
+      gsap.to(wrp, { y: 0, duration: DURATION, ease: EASE, overwrite: 'auto' });
+    });
+  }
+
+  function updateHoverAtPoint(clientX: number, clientY: number) {
+    // Skip hover updates during animation
+    if (allRows.length === 0 || isAnimating) return;
+
+    const cRect = container.getBoundingClientRect();
+
+    if (clientX < cRect.left - 20 || clientX > cRect.right + 20) {
+      resetAll();
+      return;
+    }
+
+    // When project is open, check if mouse is within visible rows bounds
+    if (isProjectOpen && clickedRowIndex >= 0) {
+      // If the opened project is in the last row, treat all rows as visible (start at 0)
+      const firstVisibleIndexForHover = clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1;
+      const firstVisibleWrapper = allWrappers[firstVisibleIndexForHover];
+      if (firstVisibleWrapper) {
+        const visibleTop = firstVisibleWrapper.getBoundingClientRect().top;
+        const visibleBottom = allWrappers[allWrappers.length - 1].getBoundingClientRect().bottom;
+
+        // If mouse is above the visible rows (e.g., over project detail), reset hover
+        if (clientY < visibleTop - 40 || clientY > visibleBottom + 40) {
+          resetAll();
+          return;
+        }
+      }
+    }
+
+    let hoveredIndex = -1;
+    let minDistance = Infinity;
+    let closestIndex = -1;
+
+    // Determine the first visible row index for iteration (handles last-row-open case)
+    const firstVisibleIndexForLoop = isProjectOpen && clickedRowIndex >= allWrappers.length - 1 ? 0 : (isProjectOpen ? clickedRowIndex + 1 : 0);
+    for (let i = 0; i < allRows.length; i++) {
+      // Skip rows that are above the visible start when project is open
+      if (isProjectOpen && i < firstVisibleIndexForLoop) continue;
+
+      const row = allRows[i];
+      const rect = row.getBoundingClientRect();
+
+      if (clientY >= rect.top && clientY <= rect.bottom) {
+        hoveredIndex = i;
+      }
+
+      let dist = 0;
+      if (clientY < rect.top) dist = rect.top - clientY;
+      else if (clientY > rect.bottom) dist = clientY - rect.bottom;
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIndex = i;
+      }
+    }
+
+    const targetRowIndex = hoveredIndex !== -1 ? hoveredIndex : closestIndex;
+
+    // If no valid row found, or target is in hidden rows when project is open
+    // Determine the first visible index for validation (handles last-row-open case)
+    const firstVisibleIndexForValidation = isProjectOpen ? (clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1) : 0;
+    if (targetRowIndex === -1 || (isProjectOpen && targetRowIndex < firstVisibleIndexForValidation)) {
+      resetAll();
+      return;
+    }
+
+    // If not directly hovering a row and too far from the closest one, reset
+    // This handles when mouse is over project detail (above visible rows)
+    if (hoveredIndex === -1 && minDistance > 100) {
+      resetAll();
+      return;
+    }
+
+    // Use correct first/last visible wrappers when project is open
+    // If the opened project is in the last row, treat all rows as visible (start at 0)
+    const firstVisibleIndex = isProjectOpen ? (clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1) : 0;
+    const firstWrapper = allWrappers[firstVisibleIndex];
+    const lastWrapper = allWrappers[allWrappers.length - 1];
+
+    // If no visible wrappers, reset and return
+    if (!firstWrapper) {
+      resetAll();
+      return;
+    }
+
+    const staticTopBounds = firstWrapper.getBoundingClientRect().top - (gsap.getProperty(firstWrapper, 'y') as number || 0);
+    const staticBottomBounds = lastWrapper.getBoundingClientRect().bottom - (gsap.getProperty(lastWrapper, 'y') as number || 0);
+    const visualTop = allRows[firstVisibleIndex].getBoundingClientRect().top;
+    const visualBottom = allRows[allRows.length - 1].getBoundingClientRect().bottom;
+
+    const effectiveTop = Math.min(visualTop, staticTopBounds);
+    const effectiveBottom = Math.max(visualBottom, staticBottomBounds);
+
+    if (clientY < effectiveTop - 40 || clientY > effectiveBottom + 40) {
+       resetAll();
+       return;
+    }
+
+    const targetRow = allRows[targetRowIndex];
+    const items = rowItemsCache.get(targetRow) || [];
+    const n = items.length;
+
+    const wrapper = allWrappers[targetRowIndex];
+    const currentY = gsap.getProperty(wrapper, 'y') as number || 0;
+    const staticTop = wrapper.getBoundingClientRect().top - currentY;
+    const staticHeight = wrapper.offsetHeight;
+
+    let cursorYNorm = (clientY - staticTop) / staticHeight;
+    cursorYNorm = Math.max(0, Math.min(1, cursorYNorm));
+
+
+
+    // Factor for row below (when cursor near bottom)
+    let verticalFactor = 0;
+    if (cursorYNorm > VERTICAL_THRESHOLD) {
+      let progress = (cursorYNorm - VERTICAL_THRESHOLD) / (1 - VERTICAL_THRESHOLD);
+      verticalFactor = Math.pow(progress, CURVE_POWER) * INTENSITY_MULTIPLIER;
+      verticalFactor = Math.min(1, verticalFactor);
+    }
+
+    // Factor for row above (when cursor near top)
+    let aboveVerticalFactor = 0;
+    const ABOVE_THRESHOLD = 0.1; // 0.25 when VERTICAL_THRESHOLD is 0.75
+    if (cursorYNorm < ABOVE_THRESHOLD) {
+      let progress = (ABOVE_THRESHOLD - cursorYNorm) / ABOVE_THRESHOLD;
+      aboveVerticalFactor = Math.pow(progress, CURVE_POWER) * INTENSITY_MULTIPLIER;
+      aboveVerticalFactor = Math.min(1, aboveVerticalFactor);
+    }
+
+    const rect = targetRow.getBoundingClientRect();
+    const cursorPos = ((clientX - rect.left) / rect.width) * n;
+    const horizontalWeights = getWeights(cursorPos, n);
+
+    const nextRowIndex = targetRowIndex + 1;
+    const hasNextRow = nextRowIndex < allRows.length;
+
+    const prevRowIndex = targetRowIndex - 1;
+    const hasPrevRow = prevRowIndex >= (isProjectOpen ? clickedRowIndex + 1 : 0);
+
+    allRows.forEach((row, i) => {
+      if (i !== targetRowIndex && i !== nextRowIndex && i !== prevRowIndex) {
+        resetRow(row);
+      }
+    });
+
+    allRows.forEach((row, i) => {
+      gsap.set(row, { zIndex: (i === targetRowIndex || i === nextRowIndex || i === prevRowIndex) ? 10 : 'auto' });
+    });
+
+    animateItems(targetRow, horizontalWeights);
+    updateEdgeFade(targetRow, { clientX, clientY } as MouseEvent, n);
+
+    if (hasNextRow) {
+      const nextRow = allRows[nextRowIndex];
+      const nextWeights = horizontalWeights.map(w => 1 + (w - 1) * verticalFactor);
+      animateItems(nextRow, nextWeights);
+    }
+
+    if (hasPrevRow) {
+      const prevRow = allRows[prevRowIndex];
+      const prevWeights = horizontalWeights.map(w => 1 + (w - 1) * aboveVerticalFactor);
+      animateItems(prevRow, prevWeights);
+    }
+
+    const activeDelta = calcMaxDelta(targetRowIndex);
+    const belowDelta = hasNextRow ? calcMaxDelta(nextRowIndex) * verticalFactor : 0;
+    const aboveDelta = hasPrevRow ? calcMaxDelta(prevRowIndex) * aboveVerticalFactor : 0;
+
+    // Only animate wrappers that need to change
+    allWrappers.forEach((wrp, i) => {
+      // Skip wrappers that are hidden when project is open (respect computed firstVisibleIndex)
+      if (isProjectOpen && i < firstVisibleIndex) return;
+
+      let yPush = 0;
+      if (i < targetRowIndex) {
+        yPush = -(activeDelta + belowDelta);
+        // Rows above the prevRow also need to account for prevRow expansion
+        if (hasPrevRow && i < prevRowIndex) {
+          setTimeout(() => {
+            yPush = -aboveDelta;
+          }, 10);
+        }
+      } else if (i === targetRowIndex) {
+
+        yPush = -belowDelta;
+      }
+
+      // Only animate if value changed
+      const currentY = gsap.getProperty(wrp, 'y') as number || 0;
+      if (Math.abs(currentY - yPush) > 0.5) {
+        gsap.to(wrp, {
+          y: yPush,
+          duration: DURATION,
+          ease: EASE,
+          overwrite: 'auto'
+        });
+      }
+    });
+
+    activeRowIndex = targetRowIndex;
+  }
 
   function getAspects(row: HTMLElement): number[] {
-    return [...row.querySelectorAll<HTMLElement>('.gallery-item')].map((item) =>
-      parseFloat(item.dataset.aspect!)
-    );
+    const items = rowItemsCache.get(row) || [];
+    return items.map(item => itemAspectsCache.get(item) || 1);
   }
 
   function getWeights(cursorPos: number, n: number): number[] {
@@ -148,7 +1200,6 @@ function getAspect(project: (typeof projects)[number]): number {
     const baseH = calcBaseHeight(rowIndex);
 
     const samplePositions = [0, n, ...Array.from({ length: n }, (_, j) => j + 0.5)];
-
     let maxDelta = 0;
     for (const cursorPos of samplePositions) {
       const weights = getWeights(cursorPos, n);
@@ -156,7 +1207,6 @@ function getAspect(project: (typeof projects)[number]): number {
       const maxNewH = Math.max(...aspects.map((a, j) => ((available * weights[j]) / sum) * a));
       maxDelta = Math.max(maxDelta, maxNewH - baseH);
     }
-
     return Math.max(0, maxDelta);
   }
 
@@ -171,29 +1221,17 @@ function getAspect(project: (typeof projects)[number]): number {
     });
   }
 
-  // ─── Edge fade ─────────────────────────────────────────────────────────────
-
   function fadeEdge(items: HTMLElement[]) {
     items.forEach((item) => {
-      const projectTitle = item.querySelector('.project-title');
-      if (projectTitle) {
-        gsap.to(projectTitle, { display: 'none', duration: 0, ease: EASE, overwrite: 'auto' });
-      }
+      const overlay = item.querySelector('.title-fade-overlay') as HTMLElement;
+      if (overlay) gsap.to(overlay, { opacity: 1, duration: DURATION_ALT, ease: EASE, overwrite: 'auto' });
     });
   }
 
   function restoreEdge(items: HTMLElement[]) {
     items.forEach((item) => {
-      const projectTitle = item.querySelector('.project-title');
-      if (projectTitle) {
-        gsap.to(projectTitle, {
-          display: 'block',
-          duration: 0,
-          delay: 0.1,
-          ease: EASE,
-          overwrite: 'auto',
-        });
-      }
+      const overlay = item.querySelector('.title-fade-overlay') as HTMLElement;
+      if (overlay) gsap.to(overlay, { opacity: 0, duration: DURATION_ALT, ease: EASE, overwrite: 'auto' });
     });
   }
 
@@ -201,18 +1239,12 @@ function getAspect(project: (typeof projects)[number]): number {
     const items = [...row.querySelectorAll<HTMLElement>('.gallery-item')];
     const previousFadedItems = fadedEdge.get(row) ?? [];
 
-    let currentTargetItems: HTMLElement[] = [];
-
     const rect = row.getBoundingClientRect();
-    const cursorX = e.clientX - rect.left;
-    const rowWidth = rect.width;
-    const isLeftHalf = cursorX < rowWidth / 2;
+    const isLeftHalf = (e.clientX - rect.left) < rect.width / 2;
 
-    if (isLeftHalf) {
-      currentTargetItems = [items[n - 1], items[n - 2]].filter(Boolean);
-    } else {
-      currentTargetItems = [items[0], items[1]].filter(Boolean);
-    }
+    const currentTargetItems: HTMLElement[] = isLeftHalf
+      ? [items[n - 1], items[n - 2]].filter(Boolean)
+      : [items[0], items[1]].filter(Boolean);
 
     const isChanged =
       currentTargetItems.length !== previousFadedItems.length ||
@@ -221,7 +1253,6 @@ function getAspect(project: (typeof projects)[number]): number {
     if (isChanged) {
       if (previousFadedItems.length > 0) restoreEdge(previousFadedItems);
       if (currentTargetItems.length > 0) fadeEdge(currentTargetItems);
-
       fadedEdge.set(row, currentTargetItems);
     }
   }
@@ -234,97 +1265,101 @@ function getAspect(project: (typeof projects)[number]): number {
     }
   }
 
-  // ─── Animation ─────────────────────────────────────────────────────────────
-
   function animateItems(row: HTMLElement, weights: number[]) {
-    row.querySelectorAll<HTMLElement>('.gallery-item').forEach((item, j) => {
-      gsap.to(item, { flexGrow: weights[j], duration: DURATION, ease: EASE, overwrite: 'auto' });
+    // Generate a key for this weight configuration to avoid redundant animations
+    const weightsKey = `${allRows.indexOf(row)}-${weights.map(w => w.toFixed(2)).join(',')}`;
+    if (weightsKey === lastWeightsKey && allRows.indexOf(row) === lastTargetRowIndex) {
+      return; // Skip if same animation
+    }
+    lastWeightsKey = weightsKey;
+    lastTargetRowIndex = allRows.indexOf(row);
+
+    const items = rowItemsCache.get(row) || [];
+    items.forEach((item, j) => {
+      // Use gsap.to directly with overwrite instead of creating timelines
+      gsap.to(item, {
+        flexGrow: weights[j],
+        duration: DURATION_ALT,
+        ease: EASE,
+        overwrite: true,
+      });
     });
   }
 
   function resetRow(row: HTMLElement) {
-    row.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
-      gsap.to(item, { flexGrow: 1, duration: DURATION, ease: EASE, overwrite: 'auto' });
+    const items = rowItemsCache.get(row) || [];
+    items.forEach((item) => {
+      gsap.to(item, { flexGrow: 1, duration: DURATION_ALT, ease: EASE, overwrite: true });
     });
     clearEdgeFade(row);
     gsap.set(row, { zIndex: 'auto' });
   }
 
-  function pushAbove(rowIndex: number, delta: number) {
-    allWrappers.forEach((wrapper, i) => {
-      if (i < rowIndex) {
-        gsap.to(wrapper, { y: -delta, duration: DURATION, ease: EASE, overwrite: 'auto' });
-      } else {
-        gsap.to(wrapper, { y: 0, duration: DURATION, ease: EASE, overwrite: 'auto' });
-      }
-    });
-  }
-
-  function resetAbove() {
-    allWrappers.forEach((wrapper) => {
-      gsap.to(wrapper, { y: 0, duration: DURATION, ease: EASE, overwrite: 'auto' });
-    });
-  }
-
-  // ─── Events ────────────────────────────────────────────────────────────────
-
-  allRows.forEach((row, rowIndex) => {
-    row.addEventListener('mouseenter', () => {
-      leaveTimer?.kill();
-      leaveTimer = null;
-      aboveTimer?.kill();
-      aboveTimer = null;
-
-      if (activeRow && activeRow !== row) resetRow(activeRow);
-      activeRow = row;
-      activeRowIndex = rowIndex;
-
-      gsap.set(row, { zIndex: 10 });
-      pushAbove(rowIndex, calcMaxDelta(rowIndex));
-    });
-
-    row.addEventListener('mousemove', (e: MouseEvent) => {
-      if (activeRow !== row) return;
-
-      const items = [...row.querySelectorAll<HTMLElement>('.gallery-item')];
-      const n = items.length;
-      const rect = row.getBoundingClientRect();
-      const cursorPos = ((e.clientX - rect.left) / rect.width) * n;
-
-      animateItems(row, getWeights(cursorPos, n));
-      updateEdgeFade(row, e, n);
-    });
-    row.addEventListener('mouseleave', () => {
-      leaveTimer = gsap.delayedCall(0, () => {
-        if (activeRow) resetRow(activeRow);
-        activeRow = null;
-        activeRowIndex = -1;
-      });
-      aboveTimer = gsap.delayedCall(LEAVE_DELAY, resetAbove);
-    });
-  });
-
-
-
   // ─── Init ──────────────────────────────────────────────────────────────────
 
   function init() {
-    lockHeights();
+    try {
+      if (allWrappers.length === 0 || allRows.length === 0) {
+        console.warn('No gallery rows found');
+        return;
+      }
 
-    // Translate the container down by the largest possible hover expansion
-    // across all rows, so the effect has room to grow upward without clipping.
-    const maxDelta = Math.max(...allWrappers.map((_, i) => calcMaxDelta(i)));
-    gsap.set(container, { y: maxDelta + 20 });
+      lockHeights();
 
-    container.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
-      const video = item.querySelector('mux-player') as HTMLVideoElement & { play: () => void; pause: () => void } | null;
-      if (!video) return;
+      const deltas = allWrappers.map((_, i) => calcMaxDelta(i)).filter(d => isFinite(d) && !isNaN(d));
+      const maxDelta = deltas.length > 0 ? Math.max(...deltas) : 0;
+      gsap.set(container, { y: maxDelta + 20 });
 
-      item.addEventListener('mouseenter', () => video.play());
-      item.addEventListener('mouseleave', () => video.pause());
-    });
+      container.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
+        const video = item.querySelector('mux-player') as (HTMLVideoElement & { play: () => void; pause: () => void }) | null;
+        if (!video) return;
+        item.addEventListener('mouseenter', () => video.play());
+        item.addEventListener('mouseleave', () => video.pause());
+      });
+    } catch (e) {
+      console.error('Error initializing gallery:', e);
+    }
   }
 
-  init();
-  window.addEventListener('resize', init);   // replaces the old resize → lockHeights
+  // Wait for DOM to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // Debounced resize handler
+  let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+  window.addEventListener('resize', () => {
+    if (resizeTimeout) clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      // Reset weight tracking caches on resize (layout changed)
+      lastWeightsKey = '';
+      lastTargetRowIndex = -1;
+
+      if (!isProjectOpen) {
+        init();
+      }
+    }, 150); // 150ms debounce
+  });
+
+  // ─── Theme Change Listener ─────────────────────────────────────────────────
+  window.addEventListener('themechange', () => {
+    const newOpacity = getMutedOpacity();
+
+    // Update sidebar list items (non-active ones)
+    document.querySelectorAll('.detail-list-item').forEach(item => {
+      const itemId = (item as HTMLElement).dataset.projectId;
+      if (itemId !== currentProjectId) {
+        gsap.to(item, { opacity: newOpacity});
+      }
+    });
+
+    // Update project type opacity
+    if (detailProjectType && isProjectOpen) {
+      gsap.to(detailProjectType, { opacity: newOpacity });
+    }
+  });
+
+  } // End of else block for DOM element check
 </script>

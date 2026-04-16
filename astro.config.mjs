@@ -29,7 +29,18 @@ export default defineConfig({
             src: ["./src/assets/fonts/AntiqueLegacy-Book.otf"],
             display: "block",
           },
-          // ...
+          {
+            weight: 500,
+            style: "normal",
+            src: ["./src/assets/fonts/AntiqueLegacy-Medium.otf"],
+            display: "block",
+          },
+          {
+            weight: 700,
+            style: "normal",
+            src: ["./src/assets/fonts/AntiqueLegacy-SemiBold.otf"],
+            display: "block",
+          },
         ],
       },
     },
