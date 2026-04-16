@@ -1,0 +1,29 @@
+---
+import{ Picture }from 'astro:assets';
+import diamond from '../assets/images/DIAMOND CAFE.jpg';
+import '../styles/global.css'
+import Layout from '../layouts/Layout.astro'
+import { MuxPlayer } from '@mux/mux-player-astro';
+---
+<Layout title="page">
+    <div class="h-screen w-full grid! grid-cols-20 gap-padding bg-theme text-theme text-sm tracking-custom uppercase relative px-padding">
+        <div class="col-span-3 h-full w-full flex flex-row items-center justify-between pr-padding">
+            <a class="opacity-muted">Exit</a>
+            <a>Previous</a>
+        </div>
+        <div class="col-span-14 h-screen w-full flex flex-row justify-center items-center overflow-clip ">
+           <!-- <Picture src={diamond} alt="DIAMOND CAFE" layout="constrained"  class="w-auto h-screen py-padding" /> -->
+            <MuxPlayer
+                playbackId="Mnbd9CGwoG8WolG3c01roKszb5Kx1vmUYBXYA3YIAb3Q"
+                class="w-full h-auto"
+                autoplay
+                loop
+            />
+        </div>
+
+        <div class="col-span-3 col-start-18 h-full w-full flex flex-row items-center justify-between pl-padding">
+            <a>Next</a>
+            <p>1/5</p>
+        </div>
+    </div>
+</Layout>
