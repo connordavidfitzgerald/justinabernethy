@@ -180,6 +180,21 @@ mux-player {
   max-height: 100vh;
   object-fit: contain;
 }
+#footer-button {
+  opacity: 1;
+  will-change: opacity;
+  transition: opacity 0.2s ease-out;
+}
+#footer-button:hover {
+  opacity: var(--opacity-muted);
+}
+#email {
+  opacity: var(--opacity-muted);
+  transition: opacity 0.2s ease-out;
+}
+#email:hover {
+  opacity: 1;
+}
 
 /* Media Chrome Custom Theme */
 media-controller {
