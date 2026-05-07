@@ -256,23 +256,23 @@ const extendedProjects =
       </div>
     </section>
     <div class="h-100"></div>
-    <div id="desktop-footer" class="h-screen min-h-220 grid! grid-cols-10! gap-gutter p-padding text-sm leading-[110%]" style="visibility: hidden; opacity: 0;">
-        <div class="col-span-5 h-full flex flex-col justify-center">
+    <div id="desktop-footer" class="h-screen min-h-220 grid! grid-cols-10! gap-gutter text-sm leading-[110%]" style="visibility: hidden; opacity: 0;">
+        <div class="min-[1100px]:col-span-5 col-span-4 h-full flex flex-col justify-center">
             <div class="flex flex-col gap-padding w-full h-fit min-[1100px]:grid min-[1100px]:grid-cols-5 min-[1100px]:gap-gutter">
                 <div class="min-[1100px]:col-span-3! flex flex-row items-start justify-start">
                     <p class="text-nowrap">
                         Director and Photographer Based in Toronto.<br/><span id="email"class="opacity-muted text-nowrap cursor-pointer">info@justinabernethy.com</span>
                     </p>
                 </div>
-                <div class="min-[1100px]:pt-0 pt-10 flex flex-row gap-10 min-[1100px]:gap-padding min-[1100px]:contents">
-                    <div id="footer-button" class="min-[1100px]:col-span-1 flex flex-row justify-start items-start hover:opacity-muted cursor-pointer">Instagram</div>
-                    <div id="footer-button" class="min-[1100px]:col-span-1 flex flex-row justify-start  items-start hover:opacity-muted cursor-pointer">Vimeo</div>
+                <div class="min-[1100px]:pt-0 pt-10 flex flex-row gap-10 min-[1100px]:gap-padding min-[1100px]:contents ">
+                    <div id="footer-button" class="min-[1100px]:col-span-1 min-[1100px]:justify-end flex flex-row justify-start items-start hover:opacity-muted cursor-pointer">Instagram</div>
+                    <div id="footer-button" class="min-[1100px]:col-span-1 min-[1100px]:justify-end min-[1100px]:pr-4  flex flex-row justify-start  items-start hover:opacity-muted cursor-pointer">Vimeo</div>
                 </div>
             </div>
         </div>
-        <div class="col-span-5 flex flex-row justify-end items-end h-full">
-            <div class="w-full">
-                <Picture src={headshot} alt="Justin Abernethy headshot" class="min-h-200 aspect-5/7 object-cover"></Picture>
+        <div class="min-[1100px]:col-span-5 col-span-6 flex flex-row justify-end items-end h-full">
+            <div class="w-full h-screen px-padding py-3">
+                <Picture src={headshot} alt="Justin Abernethy headshot" class="aspect-5/7 w-full h-full object-cover min-w-165"></Picture>
             </div>
         </div>
     </div>
@@ -313,15 +313,18 @@ const extendedProjects =
                   draggable="false"
                 />
               ) : project.muxID ? (
-                <div class="aspect-5/7 flex flex-col justify-center">
-                  <MuxPlayer
-                    playbackId={project.muxID}
-                    streamType="on-demand"
-                    loop={true}
-                    muted={true}
-                    autoplay
-                    style="aspect-ratio: 16/9; width: 100%; display: block; object-fit: cover;"
-                  />
+                <div class="w-full flex items-center justify-center" style="aspect-ratio: 5/7;">
+                  <div class="w-full" style="aspect-ratio: 16/9;">
+                    <MuxPlayer
+                      playbackId={project.muxID}
+                      streamType="on-demand"
+                      loop={true}
+                      muted={true}
+                      autoplay
+                      playsInline
+                      style="width: 100%; height: 100%; display: block; --controls: none;"
+                    />
+                  </div>
                 </div>
               ) : (
                 <div
@@ -1463,15 +1466,17 @@ const extendedProjects =
     overlayMediaContainer.innerHTML = '';
 
     if (item.type === 'video') {
-      const player = document.createElement('mux-player');
+      const player = document.createElement('mux-player') as HTMLElement & { play?: () => Promise<void> };
       player.setAttribute('playback-id', item.playbackId);
       player.className = 'w-full h-auto max-h-screen object-contain';
-      player.setAttribute('autoplay', '');
       player.setAttribute('loop', '');
       player.setAttribute('muted', '');
       player.setAttribute('playsinline', '');
       player.style.setProperty('--controls', 'none');
       overlayMediaContainer.appendChild(player);
+      customElements.whenDefined('mux-player').then(() => {
+        player.play?.().catch(() => { /* autoplay blocked */ });
+      });
     } else {
       const img = document.createElement('img');
       img.src = item.url;
@@ -2042,6 +2047,15 @@ const extendedProjects =
   }
   init();
 
+  // Programmatic play (Mux recommends `.play()` over the `autoplay` attribute
+  // so we can observe failure via the returned Promise).
+  customElements.whenDefined('mux-player').then(() => {
+    const players = slider.querySelectorAll<HTMLElement & { play?: () => Promise<void> }>('mux-player');
+    for (const p of players) {
+      p.play?.().catch(() => { /* autoplay blocked — leave paused */ });
+    }
+  });
+
   // ─── Single-view overlay ──────────────────────────────────────────────────
   type OverlayMedia =
     | { type: 'video'; playbackId: string; alt: string }
@@ -2081,9 +2095,8 @@ const extendedProjects =
     if (!item) return;
 
     if (item.type === 'video') {
-      const player = document.createElement('mux-player');
+      const player = document.createElement('mux-player') as HTMLElement & { play?: () => Promise<void> };
       player.setAttribute('playback-id', item.playbackId);
-      player.setAttribute('autoplay', '');
       player.setAttribute('loop', '');
       player.setAttribute('muted', '');
       player.setAttribute('playsinline', '');
@@ -2091,6 +2104,9 @@ const extendedProjects =
       player.style.width = '100%';
       player.style.maxHeight = '100%';
       overlayMediaEl.appendChild(player);
+      customElements.whenDefined('mux-player').then(() => {
+        player.play?.().catch(() => { /* autoplay blocked */ });
+      });
     } else {
       const img = document.createElement('img');
       img.src = item.url;
