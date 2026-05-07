@@ -31,12 +31,12 @@ img {
 }
 
 @theme inline {
-  --text-sm: 11px;
-  --text-md: 11px;
+  --text-sm: 0.65rem;
+  --text-md: 0.65rem;
 
   --spacing-padding: 0.375rem;
   --spacing-padding-half: 0.1875rem;
-  --tracking-custom: -1%;
+  --tracking-custom: 0%;
 }
 
 /* Light mode (default) */

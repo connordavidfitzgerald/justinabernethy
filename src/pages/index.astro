@@ -61,14 +61,17 @@ const projectsWithUrls = projects.map(project => ({
   })) || []
 }));
 
+// Mobile shows projects in reverse order — highest index first.
+const mobileProjects = [...projectsWithUrls].reverse();
+
 // Extended list for mobile slider's infinite loop:
 // [clone-of-last, ...real-items, clone-of-first]
 const extendedProjects =
-  projectsWithUrls.length > 0
+  mobileProjects.length > 0
     ? [
-        projectsWithUrls[projectsWithUrls.length - 1],
-        ...projectsWithUrls,
-        projectsWithUrls[0],
+        mobileProjects[mobileProjects.length - 1],
+        ...mobileProjects,
+        mobileProjects[0],
       ]
     : [];
 ---
@@ -142,7 +145,7 @@ const extendedProjects =
                           data-flip-id={`media-${project._id}`}
                         />
                       )}
-                      <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-medium tracking-custom -mt-0.5 pb-padding">
+                      <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-normal tracking-custom -mt-0.5 pb-padding">
                         <div class="absolute z-0 mt-0 h-full flex flex-col gap-0 project-title">
                           <h3 class="text-sm leading-[100%] tracking-custom whitespace-nowrap">{project.name}</h3>
                         </div>
@@ -168,7 +171,7 @@ const extendedProjects =
             <div class="col-span-2 flex flex-col h-full min-h-screen">
               <div class="sticky top-0 h-screen min-h-200 w-full flex flex-col justify-end pb-padding">
                 <!-- Project name -->
-                <div class="flex flex-col grow justify-end pb-padding text-sm uppercase tracking-custom leading-[105%] font-medium">
+                <div class="flex flex-col grow justify-end pb-padding text-sm uppercase tracking-custom leading-[105%] font-normal">
                   <h2 id="detail-project-name"></h2>
                   <h2 id="detail-project-type" class="opacity-muted"></h2>
                 </div>
@@ -206,7 +209,7 @@ const extendedProjects =
 
                 <!-- Project list -->
                 <div id="project-list-container" class="project-list-container">
-                  <div class="project-list flex flex-col justify-end gap-0 text-sm uppercase tracking-custom leading-[115%] font-medium">
+                  <div class="project-list flex flex-col justify-end gap-0 text-sm uppercase tracking-custom leading-[115%] font-normal">
                     {projectsWithUrls.map((project) => (
                       <div
                         class="detail-list-item flex flex-row gap-padding cursor-pointer opacity-muted"
@@ -292,7 +295,7 @@ const extendedProjects =
           const isCloneFirst = i === 0;
           const isCloneLast  = i === extendedProjects.length - 1;
           const realIndex = isCloneFirst
-            ? projectsWithUrls.length - 1
+            ? mobileProjects.length - 1
             : isCloneLast
               ? 0
               : i - 1;
@@ -339,7 +342,7 @@ const extendedProjects =
 
       <div
         id="center-info"
-        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-center text-white mix-blend-difference uppercase tracking-custom text-sm font-medium pointer-events-none z-10000"
+        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-center text-white mix-blend-difference uppercase tracking-custom text-sm font-normal pointer-events-none z-10000"
       >
           <span id="center-name"  class="leading-[110%]"></span>
           <span id="center-index" class="leading-[110%]"></span>
@@ -373,18 +376,18 @@ const extendedProjects =
 
       <button
         id="mobile-overlay-close"
-        class="absolute top-8 left-padding z-30 uppercase tracking-custom text-sm font-medium opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none"
+        class="absolute top-8 left-padding z-30 uppercase tracking-custom text-sm font-normal opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none"
       >Exit</button>
 
       <div
-        class="absolute bottom-padding left-padding z-30 flex flex-col items-start uppercase tracking-custom text-sm font-medium pointer-events-none leading-[110%]"
+        class="absolute bottom-padding left-padding z-30 flex flex-col items-start uppercase tracking-custom text-sm font-normal pointer-events-none leading-[110%]"
       >
         <span id="mobile-overlay-index" class="opacity-50"></span>
         <span id="mobile-overlay-name"></span>
       </div>
 
       <div
-        class="absolute bottom-padding right-padding z-30 uppercase tracking-custom text-sm font-medium pointer-events-none leading-[110%]"
+        class="absolute bottom-padding right-padding z-30 uppercase tracking-custom text-sm font-normal pointer-events-none leading-[110%]"
       >
         <span id="mobile-overlay-counter"></span>
       </div>
@@ -394,10 +397,10 @@ const extendedProjects =
 </Layout>
 
 <!-- Pass project data to client -->
-<script define:vars={{ projectsWithUrls, ROW_SIZE }}>
-  window.__PROJECTS_DATA__ = projectsWithUrls;
-  window.__ROW_SIZE__   = ROW_SIZE;
-  window.__MOBILE_PROJECTS__ = projectsWithUrls;
+<script define:vars={{ projectsWithUrls, mobileProjects, ROW_SIZE }}>
+  window.__PROJECTS_DATA__   = projectsWithUrls;
+  window.__ROW_SIZE__        = ROW_SIZE;
+  window.__MOBILE_PROJECTS__ = mobileProjects;
 </script>
 
 <script>
