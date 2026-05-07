@@ -22,6 +22,14 @@ html.lenis body {
   pointer-events: none;
 }
 
+/* Suppress visible alt-text rendering while images are loading.
+ * The `alt` attribute is still announced by screen readers — this only
+ * hides the text label browsers paint inside an unloaded <img> box. */
+img {
+  color: transparent;
+  font-size: 0;
+}
+
 @theme inline {
   --text-sm: 11px;
   --text-md: 11px;
