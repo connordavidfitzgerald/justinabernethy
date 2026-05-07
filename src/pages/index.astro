@@ -5,6 +5,7 @@ import { MuxPlayer } from '@mux/mux-player-astro';
 import { loadQuery } from '../sanity/lib/loadQuery.ts';
 import { urlForImage } from '../sanity/lib/url-for-image.ts';
 import { sanityClient } from 'sanity:client';
+import headshot from "../assets/images/JAFINALHEADSHOT.jpg"
 
 const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
  _id,
@@ -59,6 +60,17 @@ const projectsWithUrls = projects.map(project => ({
     _key: img._key
   })) || []
 }));
+
+// Extended list for mobile slider's infinite loop:
+// [clone-of-last, ...real-items, clone-of-first]
+const extendedProjects =
+  projectsWithUrls.length > 0
+    ? [
+        projectsWithUrls[projectsWithUrls.length - 1],
+        ...projectsWithUrls,
+        projectsWithUrls[0],
+      ]
+    : [];
 ---
 
 <style>
@@ -84,12 +96,12 @@ const projectsWithUrls = projects.map(project => ({
 </style>
 
 <Layout title="Justin Abernethy">
-  <main class="p-padding bg-theme text-theme">
+  <main class="hidden md:block p-padding bg-theme text-theme">
     <section class="relative">
       {projects.length === 0 && <p class="text-gray-400">No projects found.</p>}
 
       <!-- Gallery Container -->
-      <div id="gallery-container" class="flex flex-col gap-0">
+      <div id="gallery-container" class="flex flex-col gap-0" style="visibility: hidden; opacity: 0;">
         {
           rows.map((row, rowIndex) => (
             <div class="gallery-row-wrapper relative" data-wrapper={rowIndex}>
@@ -130,7 +142,7 @@ const projectsWithUrls = projects.map(project => ({
                           data-flip-id={`media-${project._id}`}
                         />
                       )}
-                      <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-medium -mt-0.5 pb-padding">
+                      <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-medium tracking-custom -mt-0.5 pb-padding">
                         <div class="absolute z-0 mt-0 h-full flex flex-col gap-0 project-title">
                           <h3 class="text-sm leading-[100%] tracking-custom whitespace-nowrap">{project.name}</h3>
                         </div>
@@ -243,20 +255,160 @@ const projectsWithUrls = projects.map(project => ({
         </div>
       </div>
     </section>
+    <div class="h-100"></div>
+    <div id="desktop-footer" class="h-screen min-h-220 grid! grid-cols-10! gap-gutter p-padding text-sm leading-[110%]" style="visibility: hidden; opacity: 0;">
+        <div class="col-span-5 h-full flex flex-col justify-center">
+            <div class="flex flex-col gap-padding w-full h-fit min-[1100px]:grid min-[1100px]:grid-cols-5 min-[1100px]:gap-gutter">
+                <div class="min-[1100px]:col-span-3! flex flex-row items-start justify-start">
+                    <p class="text-nowrap">
+                        Director and Photographer Based in Toronto.<br/><span id="email"class="opacity-muted text-nowrap cursor-pointer">info@justinabernethy.com</span>
+                    </p>
+                </div>
+                <div class="min-[1100px]:pt-0 pt-10 flex flex-row gap-10 min-[1100px]:gap-padding min-[1100px]:contents">
+                    <div id="footer-button" class="min-[1100px]:col-span-1 flex flex-row justify-start items-start hover:opacity-muted cursor-pointer">Instagram</div>
+                    <div id="footer-button" class="min-[1100px]:col-span-1 flex flex-row justify-start  items-start hover:opacity-muted cursor-pointer">Vimeo</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-span-5 flex flex-row justify-end items-end h-full">
+            <div class="w-full">
+                <Picture src={headshot} alt="Justin Abernethy headshot" class="min-h-200 aspect-5/7 object-cover"></Picture>
+            </div>
+        </div>
+    </div>
   </main>
+
+  <!-- ────────────────────────────── Mobile root ────────────────────────────── -->
+  <div class="md:hidden fixed inset-0 z-50 bg-theme text-theme overflow-hidden p-padding">
+    <div
+      id="mobile-slider"
+      class="h-full w-full relative overflow-hidden touch-none select-none"
+    >
+      <div
+        id="slider-track"
+        class="absolute left-0 right-0 flex flex-col"
+      >
+        {extendedProjects.map((project: any, i: number) => {
+          const isCloneFirst = i === 0;
+          const isCloneLast  = i === extendedProjects.length - 1;
+          const realIndex = isCloneFirst
+            ? projectsWithUrls.length - 1
+            : isCloneLast
+              ? 0
+              : i - 1;
+
+          return (
+            <div
+              class="slider-slide w-full shrink-0 flex items-center px-10"
+              data-real-index={realIndex}
+              data-virtual-index={i}
+            >
+              {project.thumbnailUrl ? (
+                <img
+                  src={project.thumbnailUrl}
+                  alt={project.name ?? ''}
+                  class="w-full object-cover block"
+                  style="aspect-ratio: 5/7;"
+                  loading={i <= 2 ? 'eager' : 'lazy'}
+                  draggable="false"
+                />
+              ) : project.muxID ? (
+                <div class="aspect-5/7 flex flex-col justify-center">
+                  <MuxPlayer
+                    playbackId={project.muxID}
+                    streamType="on-demand"
+                    loop={true}
+                    muted={true}
+                    autoplay
+                    style="aspect-ratio: 16/9; width: 100%; display: block; object-fit: cover;"
+                  />
+                </div>
+              ) : (
+                <div
+                  class="w-full bg-gray-800 block"
+                  style="aspect-ratio: 5/7;"
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div
+        id="center-info"
+        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-center text-white mix-blend-difference uppercase tracking-custom text-sm font-medium pointer-events-none z-10000"
+      >
+          <span id="center-name"  class="leading-[110%]"></span>
+          <span id="center-index" class="leading-[110%]"></span>
+
+
+      </div>
+    </div>
+
+    <!-- Mobile single-view overlay -->
+    <div
+      id="mobile-overlay"
+      class="fixed inset-0 z-[10000] bg-black text-white hidden opacity-0 pointer-events-none"
+    >
+      <div class="absolute inset-0 p-padding flex items-center justify-center">
+        <div
+          id="mobile-overlay-media"
+          class="w-full h-full flex items-center justify-center opacity-0"
+        ></div>
+      </div>
+
+      <button
+        id="mobile-overlay-prev-zone"
+        class="absolute top-0 bottom-0 left-0 w-1/2 z-20 bg-transparent appearance-none border-0 outline-none"
+        aria-label="Previous image"
+      ></button>
+      <button
+        id="mobile-overlay-next-zone"
+        class="absolute top-0 bottom-0 right-0 w-1/2 z-20 bg-transparent appearance-none border-0 outline-none"
+        aria-label="Next image"
+      ></button>
+
+      <button
+        id="mobile-overlay-close"
+        class="absolute top-8 left-padding z-30 uppercase tracking-custom text-sm font-medium opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none"
+      >Exit</button>
+
+      <div
+        class="absolute bottom-padding left-padding z-30 flex flex-col items-start uppercase tracking-custom text-sm font-medium pointer-events-none leading-[110%]"
+      >
+        <span id="mobile-overlay-index" class="opacity-50"></span>
+        <span id="mobile-overlay-name"></span>
+      </div>
+
+      <div
+        class="absolute bottom-padding right-padding z-30 uppercase tracking-custom text-sm font-medium pointer-events-none leading-[110%]"
+      >
+        <span id="mobile-overlay-counter"></span>
+      </div>
+    </div>
+  </div>
 
 </Layout>
 
 <!-- Pass project data to client -->
 <script define:vars={{ projectsWithUrls, ROW_SIZE }}>
   window.__PROJECTS_DATA__ = projectsWithUrls;
-  window.__ROW_SIZE__ = ROW_SIZE;
+  window.__ROW_SIZE__   = ROW_SIZE;
+  window.__MOBILE_PROJECTS__ = projectsWithUrls;
 </script>
 
 <script>
-  import { overwrite } from 'astro:schema';
-import gsap from 'gsap';
+  import gsap from 'gsap';
 
+  // Each script gates init on initial breakpoint and never re-runs the other
+  // path — reload on crossover so the matching gallery initialises cleanly.
+  matchMedia('(min-width: 768px)').addEventListener('change', () => {
+    location.reload();
+  });
+
+  // Only initialise the desktop gallery at md+ breakpoint (≥768px).
+  // The mobile slider lives in a separate <script> block below.
+  if (matchMedia('(min-width: 768px)').matches) {
 
   // ─── Constants ─────────────────────────────────────────────────────────────
   const FALLOFF = 0.8;
@@ -264,18 +416,19 @@ import gsap from 'gsap';
   const DURATION = 0.5;
   const DURATION_ALT = 0.5;
   const EASE = 'power3.out';
-  const COVER_DURATION = 1.2;
-  const COVER_STAGGER_WINDOW = 0.8; // Total time window for all staggers
-  const COVER_STAGGER_CURVE = 1.5; // Power curve (<1 = ramps down, items bunch at end)
+  const COVER_DURATION = 0.9;
+  const COVER_STAGGER_WINDOW = 0.8;
+  const COVER_STAGGER_CURVE = 3;
   const FLIP_DURATION = 0.6;
-  const SETTLE_DURATION = 0.6; // Duration for hover animations to settle before capturing
+  const SETTLE_DURATION = 0.6;
 
-  const MOVE_DURATION = 1.2;
-  const MOVE_DELAY = 0.7;
+  const MOVE_DURATION = 1;
+  const MOVE_DELAY = 0.1;
 
   const VERTICAL_THRESHOLD = 0.9;
   const INTENSITY_MULTIPLIER = 0.8;
-  const CURVE_POWER = 1;
+  const CURVE_POWER = 1.2;
+
   // Helper to get theme-aware muted opacity
   function getMutedOpacity(): number {
     return document.documentElement.classList.contains('dark') ? 0.2 : 0.3;
@@ -307,11 +460,9 @@ import gsap from 'gsap';
   const detailProjectType = document.getElementById('detail-project-type')!;
   const detailImageGallery = document.getElementById('detail-image-gallery');
 
-  // Early exit if essential elements don't exist
   if (!container || !projectDetail || !detailProjectName || !detailProjectType || !detailImageGallery) {
     console.error('Missing essential DOM elements');
   } else {
-  // Main script wrapped in else block to prevent execution when elements are missing
 
   const allWrappers = [...container.querySelectorAll<HTMLElement>('.gallery-row-wrapper')];
   const allRows = [...container.querySelectorAll<HTMLElement>('.gallery-row')];
@@ -320,7 +471,7 @@ import gsap from 'gsap';
   // ─── State ─────────────────────────────────────────────────────────────────
   let activeRowIndex: number = -1;
   let isProjectOpen = false;
-  let isAnimating = false; // Block hover updates during open/close animations
+  let isAnimating = false;
   let currentProjectId: string | null = null;
   let clickedRowIndex: number = -1;
   let savedMaxDelta: number = 0;
@@ -330,18 +481,47 @@ import gsap from 'gsap';
   let lastMouseY = 0;
 
   // ─── Cached Data ───────────────────────────────────────────────────────────
-  // Cache items per row to avoid repeated DOM queries
+  // Per-row / per-item caches (built once)
   const rowItemsCache = new Map<HTMLElement, HTMLElement[]>();
   const itemAspectsCache = new Map<HTMLElement, number>();
+  const rowAspectsCache = new Map<HTMLElement, number[]>();
+  const rowIndexCache = new Map<HTMLElement, number>();
+  const itemGlobalIndexCache = new Map<HTMLElement, number>();
+  const itemRowCache = new Map<HTMLElement, number>();
 
-  // Pre-cache row items and aspects
-  allRows.forEach(row => {
+  // QuickTo setters — drastically faster than creating gsap.to() tweens every frame
+  type QuickToFunc = ReturnType<typeof gsap.quickTo>;
+  const itemFlexQuickTo = new Map<HTMLElement, QuickToFunc>();
+  const wrapperYQuickTo = new Map<HTMLElement, QuickToFunc>();
+
+  // Track wrapper y values ourselves to avoid gsap.getProperty() in the hover loop
+  const wrapperYValues = new Map<HTMLElement, number>();
+
+  // Per-row max-delta cache (only changes on resize)
+  let cachedMaxDeltas: number[] = [];
+
+  // Pre-build per-row / per-item caches and quickTo setters
+  allRows.forEach((row, i) => {
     const items = [...row.querySelectorAll<HTMLElement>('.gallery-item')];
     rowItemsCache.set(row, items);
-    items.forEach(item => {
-      itemAspectsCache.set(item, parseFloat(item.dataset.aspect || '1'));
-    });
+    rowIndexCache.set(row, i);
+
+    const aspects: number[] = [];
+    for (const item of items) {
+      const a = parseFloat(item.dataset.aspect || '1');
+      itemAspectsCache.set(item, a);
+      aspects.push(a);
+      itemGlobalIndexCache.set(item, parseInt(item.dataset.globalIndex || '0'));
+      itemRowCache.set(item, parseInt(item.dataset.row || '0'));
+      itemFlexQuickTo.set(item, gsap.quickTo(item, 'flexGrow', { duration: DURATION_ALT, ease: EASE }));
+    }
+    rowAspectsCache.set(row, aspects);
   });
+
+  for (const wrp of allWrappers) {
+    wrapperYQuickTo.set(wrp, gsap.quickTo(wrp, 'y', { duration: DURATION, ease: EASE }));
+    wrapperYValues.set(wrp, 0);
+  }
 
   // Cache preview elements for sidebar
   const previewCache = new Map<string, HTMLElement>();
@@ -350,9 +530,28 @@ import gsap from 'gsap';
     if (id) previewCache.set(id, el);
   });
 
-  // Track last animated state to avoid redundant animations
-  let lastTargetRowIndex = -1;
-  let lastWeightsKey = '';
+  // Cache sidebar list items once (was being re-queried on every project switch)
+  const detailListItemsCache = [...document.querySelectorAll<HTMLElement>('.detail-list-item')];
+
+  // Reusable buffers to avoid per-frame allocations in the hover hot path
+  const weightsBuffer: number[] = [];
+  const altWeightsBuffer: number[] = [];
+
+  // ─── Wrapper Y helpers (keep cache + animation in sync) ────────────────────
+  function setWrapperYAnimated(wrp: HTMLElement, y: number) {
+    wrapperYValues.set(wrp, y);
+    const setter = wrapperYQuickTo.get(wrp);
+    if (setter) setter(y);
+  }
+
+  function setWrapperYInstant(wrp: HTMLElement, y: number) {
+    wrapperYValues.set(wrp, y);
+    gsap.set(wrp, { y });
+  }
+
+  function getWrapperY(wrp: HTMLElement): number {
+    return wrapperYValues.get(wrp) ?? 0;
+  }
 
   // Get project data from window
   const projectsData = (window as any).__PROJECTS_DATA__ as any[] || [];
@@ -365,19 +564,16 @@ import gsap from 'gsap';
   }
 
   function populateProjectDetail(project: any) {
-    // Set project name and type
     detailProjectName.textContent = project.name;
     detailProjectType.textContent = project.type || '';
 
     // Clear existing gallery
-    detailImageGallery.innerHTML = '';
+    detailImageGallery!.innerHTML = '';
 
-    // Add first image slot (will be populated by FLIP animation target)
+    // Build first slot
     const firstSlot = document.createElement('div');
     firstSlot.className = 'col-span-1 w-full overflow-visible';
     firstSlot.id = 'detail-first-image';
-
-    attachDetailGalleryListeners();
 
     if (project.muxID && !project.thumbnailUrl) {
       firstSlot.innerHTML = `
@@ -401,11 +597,12 @@ import gsap from 'gsap';
         />
       `;
     }
-    detailImageGallery.appendChild(firstSlot);
+    detailImageGallery!.appendChild(firstSlot);
 
-    // Add gallery images with cover overlays for reveal animation
+    // Batch-append gallery slots via DocumentFragment (single reflow)
     if (project.galleryUrls && project.galleryUrls.length > 0) {
-      project.galleryUrls.forEach((img: any) => {
+      const fragment = document.createDocumentFragment();
+      for (const img of project.galleryUrls) {
         const slot = document.createElement('div');
         slot.className = 'col-span-1 w-full overflow-hidden relative';
         slot.innerHTML = `
@@ -417,19 +614,19 @@ import gsap from 'gsap';
           />
           <div class="gallery-image-cover absolute inset-0 bg-theme z-10 pointer-events-none"></div>
         `;
-        detailImageGallery.appendChild(slot);
-      });
+        fragment.appendChild(slot);
+      }
+      detailImageGallery!.appendChild(fragment);
     }
 
-    // Update active state in sidebar list
-    document.querySelectorAll('.detail-list-item').forEach(item => {
-      const itemId = (item as HTMLElement).dataset.projectId;
-      if (itemId === project._id) {
-        gsap.to(item, { opacity: 1});
-      } else {
-        gsap.to(item, { opacity: getMutedOpacity()});
-      }
-    });
+    // Update active state in sidebar list (use cached node list)
+    const muted = getMutedOpacity();
+    for (const item of detailListItemsCache) {
+      const itemId = item.dataset.projectId;
+      gsap.to(item, { opacity: itemId === project._id ? 1 : muted });
+    }
+
+    // Single attach call (was called twice; second was a no-op via guard)
     attachDetailGalleryListeners();
   }
 
@@ -440,67 +637,57 @@ import gsap from 'gsap';
     if (!project) return;
 
     isProjectOpen = true;
-    isAnimating = true; // Block hover updates during animation
+    isAnimating = true;
     currentProjectId = projectId;
-    clickedRowIndex = parseInt(clickedItem.dataset.row || '0');
+    clickedRowIndex = itemRowCache.get(clickedItem) ?? 0;
 
     // Populate project detail (but keep it hidden for now)
     populateProjectDetail(project);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // STAGE 0: Settle hover animations before capturing position
-    // ═══════════════════════════════════════════════════════════════════════════
+        // STAGE 0: Settle hover animations before capturing position
+        // ═══════════════════════════════════════════════════════════════════════════
+        //
+        // Drive the settle through the *existing* quickTo setters rather than
+        // creating new tweens with `overwrite: true`. Overwriting kills the
+        // underlying quickTo tween (its duration becomes 0), and after that
+        // calling the setter is a silent no-op — which silently breaks the
+        // magnify-on-hover effect for the rows that remain visible below the
+        // opened project. Reusing the setters keeps them alive.
 
-    // Create a timeline to settle all hover animations
-    const settleTl = gsap.timeline({
-      onComplete: () => {
-        // Now that everything is settled, capture position and start the main animation
-        startOpenAnimation(projectId, clickedItem, project);
+        for (const row of allRows) {
+          const items = rowItemsCache.get(row) || [];
+          for (const item of items) {
+            const itemSetter = itemFlexQuickTo.get(item);
+            if (itemSetter) itemSetter(1);
+          }
+        }
+
+        for (const wrapper of allWrappers) {
+          wrapperYValues.set(wrapper, 0);
+          const wSetter = wrapperYQuickTo.get(wrapper);
+          if (wSetter) wSetter(0);
+        }
+
+        // Reset hover-state tracking so the post-open hover code starts clean.
+        activeRowIndex = -1;
+
+        // The quickTo setters above use DURATION/DURATION_ALT (≤0.5s) so
+        // SETTLE_DURATION is plenty of time for them to visually finish before
+        // the open animation begins.
+        gsap.delayedCall(SETTLE_DURATION, () => {
+          startOpenAnimation(projectId, clickedItem, project);
+        });
       }
-    });
-
-    // Animate all items back to rest state (flexGrow: 1)
-    allRows.forEach(row => {
-      row.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
-        settleTl.to(item, {
-          flexGrow: 1,
-          duration: SETTLE_DURATION,
-          ease: 'power2.out',
-          overwrite: true
-        }, 0);
-      });
-    });
-
-    // Animate all wrappers back to rest state (y: 0)
-    allWrappers.forEach((wrapper) => {
-      settleTl.to(wrapper, {
-        y: 0,
-        duration: SETTLE_DURATION,
-        ease: 'power2.out',
-        overwrite: true
-      }, 0);
-    });
-  }
 
   function startOpenAnimation(projectId: string, clickedItem: HTMLElement, project: any) {
-    // Disable sidebar pointer events during animation
     projectListContainer.style.pointerEvents = 'none';
 
-    // Get clicked item's media element and capture its position AFTER settling
     const clickedMedia = clickedItem.querySelector('.item-media') as HTMLElement;
     const clickedRect = clickedMedia.getBoundingClientRect();
     const clickedCaption = clickedItem.querySelector('.item-name-type') as HTMLElement;
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // STAGE 1: Create fixed clone, animate covers on other items
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // Create a fixed-position clone of the clicked media
-    // This stays in place visually while we manipulate the DOM and scroll
-
     if (clickedCaption) clickedCaption.style.visibility = 'hidden';
-    // Hide the original clicked media (clone is now visible in its place)
-
 
     const clone = clickedMedia.cloneNode(true) as HTMLElement;
     clone.id = 'transition-clone';
@@ -517,30 +704,26 @@ import gsap from 'gsap';
     document.body.appendChild(clone);
     clickedMedia.style.visibility = 'hidden';
 
-    // Get ALL items except clicked one to cover during Stage 1
-    // Disable pointer events on clicked item to prevent hover interference during animation
     clickedItem.style.pointerEvents = 'none';
 
-    const clickedGlobalIndex = parseInt(clickedItem.dataset.globalIndex || '0');
+    const clickedGlobalIndex = itemGlobalIndexCache.get(clickedItem) ?? 0;
 
     // Only animate items that are visible in the viewport
     const viewportHeight = window.innerHeight;
-    const viewportTop = 0;
-    const viewportBottom = viewportHeight;
 
-    const itemsToHide = allItems
-      .filter(item => {
-        const rect = item.getBoundingClientRect();
-        // Item is visible if it overlaps with the viewport
-        return rect.bottom > viewportTop && rect.top < viewportBottom;
-      })
-      .map(item => ({
-        item,
-        distance: Math.abs(parseInt(item.dataset.globalIndex || '0') - clickedGlobalIndex)
-      }))
-      .sort(() => Math.random() - 0.5);
+    const itemsToHide: { item: HTMLElement; distance: number }[] = [];
+    for (const item of allItems) {
+      const rect = item.getBoundingClientRect();
+      if (rect.bottom > 0 && rect.top < viewportHeight) {
+        itemsToHide.push({
+          item,
+          distance: Math.abs((itemGlobalIndexCache.get(item) ?? 0) - clickedGlobalIndex)
+        });
+      }
+    }
+    // Shuffle (preserved from original behaviour)
+    itemsToHide.sort(() => Math.random() - 0.5);
 
-    // Animate covers on other items (exponentially decreasing stagger)
     const tl = gsap.timeline();
     const totalItems = itemsToHide.length;
 
@@ -548,18 +731,12 @@ import gsap from 'gsap';
       const cover = item.querySelector('.gallery-item-cover') as HTMLElement;
       if (!cover) return;
 
-      // Get the actual pixel height of the cover for precise animation
       const coverHeight = cover.offsetHeight;
-
-      // Immediately set cover to starting position (below the item)
       gsap.set(cover, { y: coverHeight, immediateRender: true, overwrite: true });
 
-      // Calculate exponential stagger delay (ramps down so items bunch together at end)
-      // Using power curve: delay = window * (normalizedIndex ^ curve)
       const normalizedIndex = totalItems > 1 ? index / (totalItems - 1) : 0;
       const staggerDelay = COVER_STAGGER_WINDOW * Math.pow(normalizedIndex, COVER_STAGGER_CURVE);
 
-      // Animate cover sliding up to cover the image
       tl.to(cover, {
         y: 0,
         duration: COVER_DURATION,
@@ -569,22 +746,18 @@ import gsap from 'gsap';
     });
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // STAGE 2: After covers complete, set up layout and animate clone to target
+    // STAGE 2: Set up layout and animate clone to target
     // ═══════════════════════════════════════════════════════════════════════════
 
     tl.call(() => {
-      // Check if clicked row is the last row
       const isLastRow = clickedRowIndex === allWrappers.length - 1;
 
-      // Hide rows up to and including clicked row (unless it's the last row - then show all)
       if (!isLastRow) {
         for (let i = 0; i <= clickedRowIndex; i++) {
           allWrappers[i].style.display = 'none';
         }
       }
 
-      // Remove covers from visible rows
-      // If last row clicked, remove covers from ALL rows; otherwise only rows below
       const firstVisibleRow = isLastRow ? 0 : clickedRowIndex + 1;
       for (let i = firstVisibleRow; i < allWrappers.length; i++) {
         allWrappers[i].querySelectorAll('.gallery-item-cover').forEach(cover => {
@@ -592,46 +765,28 @@ import gsap from 'gsap';
         });
       }
 
-      // Calculate the same spacing used for hover (maxDelta + 20)
-      const deltas = allWrappers.map((_, i) => calcMaxDelta(i)).filter(d => isFinite(d) && !isNaN(d));
+      // Use pre-computed deltas
+      const deltas = cachedMaxDeltas.filter(d => isFinite(d) && !isNaN(d));
       savedMaxDelta = deltas.length > 0 ? Math.max(...deltas) : 0;
 
-      // Add margin-top to container to create spacing below project detail
-      gsap.set(container, { y: 0, marginTop: savedMaxDelta*2});
+      setWrapperYInstant(container as any, 0); // container isn't a wrapper but harmless to track
+      gsap.set(container, { y: 0, marginTop: savedMaxDelta * 2 });
 
-      // Move project detail BEFORE the gallery container
       container.parentElement?.insertBefore(projectDetail, container);
-
-      // Show project detail with fade-in
 
       gsap.set(projectListContainer, { opacity: 0 });
       projectDetail.classList.remove('hidden');
 
-      // Instantly scroll to top - INVISIBLE because clone is fixed in viewport
       window.scrollTo(0, 0);
 
-
-      // Force layout reflow so target element has computed dimensions
       void projectDetail.offsetHeight;
 
-      // Get target media position (now that we're scrolled to top, this is accurate)
       const targetMedia = document.querySelector('#detail-first-image img, #detail-first-image mux-player') as HTMLElement;
 
       if (targetMedia) {
-        // Don't hide target - let clone (z-index 9999) sit on top of it
-        // Target is visible underneath, so when clone is removed, there's no flash
-
         const targetRect = targetMedia.getBoundingClientRect();
-        // Hide target initially (clone will animate to its position)
         targetMedia.style.visibility = 'hidden';
-        // Animation parameters
 
-
-        // Calculate scale factors
-        const scaleX = clickedRect.width / targetRect.width;
-        const scaleY = clickedRect.height / targetRect.height;
-
-        // Animate clone from its current fixed position to target position
         gsap.to(clone, {
           top: targetRect.top,
           left: targetRect.left,
@@ -641,50 +796,39 @@ import gsap from 'gsap';
           duration: MOVE_DURATION,
           ease: "power3.out",
           onComplete: () => {
-            // Just remove the clone - target is already visible underneath
             clone.remove();
             targetMedia.style.visibility = 'visible';
           }
         });
 
-
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // STAGE 3: Reveal project detail elements and remove covers from rows below
-        // ═══════════════════════════════════════════════════════════════════════
-
-        // Reveal gallery images by sliding covers up
-        const galleryCovers = detailImageGallery.querySelectorAll('.gallery-image-cover');
+        // Reveal gallery images
+        const galleryCovers = detailImageGallery!.querySelectorAll('.gallery-image-cover');
         gsap.fromTo(galleryCovers,
           { y: 0 },
-          { y: '-100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: MOVE_DURATION +0.4}
+          { y: '-100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: MOVE_DURATION + 0.4 }
         );
 
-        // Remove covers from rows below (they were never covered, but ensure they're revealed)
         for (let i = clickedRowIndex + 1; i < allWrappers.length; i++) {
           allWrappers[i].querySelectorAll('.gallery-item-cover').forEach(cover => {
             gsap.set(cover, { y: '100%' });
           });
         }
 
-        gsap.fromTo(detailProjectName, { opacity: 0 }, { opacity: 1, duration: 2, delay: 1, ease: "power2.out"});
-        gsap.fromTo(detailProjectType, { opacity: 0 }, { opacity: getMutedOpacity(), duration: 2, delay: 1.1, ease: "power2.out"});
-        gsap.fromTo(projectListContainer, { opacity: 0 }, { opacity: 1, duration: 2, delay: 1.2, ease: "power2.out", onComplete: () => {
-          // Re-enable sidebar pointer events after animation completes
-           projectListContainer.style.pointerEvents = 'auto';
-        }});
-        // Re-enable hover updates after animation completes
-        isAnimating = false;
+        gsap.fromTo(detailProjectName, { opacity: 0 }, { opacity: 1, duration: 2, delay: 1, ease: "power2.out" });
+        gsap.fromTo(detailProjectType, { opacity: 0 }, { opacity: getMutedOpacity(), duration: 2, delay: 1.1, ease: "power2.out" });
+        gsap.fromTo(projectListContainer, { opacity: 0 }, {
+          opacity: 1, duration: 2, delay: 1.2, ease: "power2.out", onComplete: () => {
+            projectListContainer.style.pointerEvents = 'auto';
+          }
+        });
 
-        // Setup scroll observer AFTER all DOM changes are complete
+        isAnimating = false;
         setupScrollObserver();
 
       } else {
-        // Fallback: just remove clone
         clone.remove();
         isAnimating = false;
         setupScrollObserver();
-
       }
     });
   }
@@ -692,106 +836,75 @@ import gsap from 'gsap';
   function closeProject(instant = true) {
     if (!isProjectOpen) return;
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SEAMLESS CLOSE: Keep visible content stable, reset everything above viewport
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // Stop Lenis to prevent smooth scroll interference during close
     const lenis = (window as any).lenis;
     if (lenis) lenis.stop();
 
-    // Find the first visible row (the one the user is looking at)
-    // If last row was clicked, all rows are visible starting from 0
     const isLastRow = clickedRowIndex === allWrappers.length - 1;
     const firstVisibleIndex = isLastRow ? 0 : clickedRowIndex + 1;
     const firstVisibleWrapper = allWrappers[firstVisibleIndex];
 
-    // Capture the current visual position of the first visible row
     const anchorRect = firstVisibleWrapper?.getBoundingClientRect();
     const anchorTop = anchorRect?.top ?? 0;
 
-    // Now do all the resets
     isProjectOpen = false;
     isAnimating = false;
     currentProjectId = null;
 
-    // Clean up scroll observer
     cleanupScrollObserver();
 
-    // Hide project detail instantly (it's above viewport anyway)
     projectDetail.classList.add('hidden');
 
-    // Move project detail back to after the gallery container
     container.parentElement?.insertBefore(projectDetail, container.nextSibling);
 
-    // Show all rows and reset visibility
-    // Reset only previously hidden rows (0 to clickedRowIndex) to avoid affecting visible content
     const hiddenRowEnd = firstVisibleIndex;
 
-    allWrappers.forEach((wrapper, i) => {
+    for (const wrapper of allWrappers) {
       wrapper.style.display = '';
       wrapper.style.visibility = '';
+      setWrapperYInstant(wrapper, 0);
+    }
 
-      // Reset y transform for ALL wrappers to ensure consistent state
-      gsap.set(wrapper, { y: 0 });
-    });
-
-    // Reset flexGrow only for previously hidden rows
+    // Reset flexGrow only for previously hidden rows (preserves visible animation state)
     for (let i = 0; i < hiddenRowEnd; i++) {
-      allRows[i].querySelectorAll<HTMLElement>('.gallery-item').forEach(item => {
+      const items = rowItemsCache.get(allRows[i]) || [];
+      for (const item of items) {
         gsap.set(item, { flexGrow: 1 });
-      });
+      }
     }
 
     // Reset all covers instantly
-    allItems.forEach(item => {
+    for (const item of allItems) {
       const cover = item.querySelector('.gallery-item-cover') as HTMLElement;
-      gsap.set(cover, { y: '100%' });
-    });
+      if (cover) gsap.set(cover, { y: '100%' });
+    }
 
-    // Reset container margin and restore original y offset for hover
-    // Use savedMaxDelta to ensure consistency with open state
     gsap.set(container, { marginTop: 0, y: savedMaxDelta + 20 });
 
-    // Reset clicked item visibility and pointer-events (including media and caption)
-    allItems.forEach(item => {
+    // Reset visibility/pointer-events on items, media, captions
+    for (const item of allItems) {
       item.style.visibility = '';
       item.style.pointerEvents = '';
       const media = item.querySelector('.item-media') as HTMLElement;
       if (media) media.style.visibility = '';
       const caption = item.querySelector('.item-name-type') as HTMLElement;
       if (caption) caption.style.visibility = '';
-    });
+    }
 
-    // Reset hover state (don't call init() - it would reset flexGrow and recalculate heights causing visual jumps)
     clickedRowIndex = -1;
     activeRowIndex = -1;
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SCROLL COMPENSATION: Adjust scroll so visible content stays in place
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // Scroll compensation so visible content stays put
     if (firstVisibleWrapper) {
-      // Force layout recalculation
       void firstVisibleWrapper.offsetHeight;
-
-      // Get the new position after all resets
       const newRect = firstVisibleWrapper.getBoundingClientRect();
-      const newTop = newRect.top;
+      const shift = newRect.top - anchorTop;
 
-      // Calculate how much the content shifted
-      const shift = newTop - anchorTop;
-
-      // Compensate by adjusting scroll position (instant, no animation)
       if (Math.abs(shift) > 1) {
-        // Use native scroll since Lenis is stopped
-        window.scrollTo({ top: window.scrollY + shift, behavior: 'instant' });
+        window.scrollTo({ top: window.scrollY + shift, behavior: 'instant' as ScrollBehavior });
       }
     }
 
-    // Resume Lenis after scroll compensation
     if (lenis) {
-      // Small delay to ensure DOM has settled before resuming smooth scroll
       requestAnimationFrame(() => {
         lenis.start();
       });
@@ -806,25 +919,21 @@ import gsap from 'gsap';
 
     currentProjectId = newProjectId;
 
-    // Fade out current gallery
-    gsap.to(detailImageGallery.children, {
+    gsap.to(detailImageGallery!.children, {
       opacity: 0,
       duration: DURATION_ALT * 0.5,
       ease: EASE,
       onComplete: () => {
-        // Populate new project
         populateProjectDetail(project);
 
-        // Fade in new gallery
-
-        gsap.fromTo(detailImageGallery.children,
+        gsap.fromTo(detailImageGallery!.children,
           { opacity: 0, y: 10 },
           { opacity: 1, y: 0, duration: DURATION, ease: EASE, stagger: 0.03 }
         );
-        const galleryCovers = detailImageGallery.querySelectorAll('.gallery-image-cover');
+        const galleryCovers = detailImageGallery!.querySelectorAll('.gallery-image-cover');
         gsap.fromTo(galleryCovers,
           { y: 0 },
-          { y: '-100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: DURATION/2 }
+          { y: '-100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: DURATION / 2 }
         );
       }
     });
@@ -836,42 +945,30 @@ import gsap from 'gsap';
   let scrollHandler: (() => void) | null = null;
 
   function setupScrollObserver() {
-    if (scrollObserver) {
-      scrollObserver.disconnect();
-    }
-    if (scrollHandler) {
-      window.removeEventListener('scroll', scrollHandler);
-    }
+    if (scrollObserver) scrollObserver.disconnect();
+    if (scrollHandler) window.removeEventListener('scroll', scrollHandler);
 
-    // Get the first visible row wrapper
-    // If last row was clicked, all rows are visible starting from 0
     const isLastRow = clickedRowIndex === allWrappers.length - 1;
     const firstVisibleIndex = isLastRow ? 0 : clickedRowIndex + 1;
     const firstVisibleWrapper = allWrappers[firstVisibleIndex];
 
-    // If no visible rows below, no need for observer
     if (!firstVisibleWrapper) return;
 
-    // IntersectionObserver for primary detection
-    // Observe the first visible row wrapper for more reliable detection
     scrollObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        // Close when the bottom of the first visible row reaches the top of the viewport
+      for (const entry of entries) {
         if (isProjectOpen && entry.boundingClientRect.top <= 0) {
           closeProject(true);
         }
-      });
+      }
     }, {
-      threshold: [0, 0.1, 0.25, 0.5], // Multiple thresholds for better detection
+      threshold: [0, 0.1, 0.25, 0.5],
       rootMargin: '0px 0px 0px 0px'
     });
 
     scrollObserver.observe(firstVisibleWrapper);
 
-    // Scroll listener as backup (checks on every scroll)
     scrollHandler = () => {
       if (!isProjectOpen) return;
-      // Close when the bottom of the first visible row reaches the top of the viewport
       const wrapperRect = firstVisibleWrapper.getBoundingClientRect();
       if (wrapperRect.bottom <= 0) {
         closeProject(true);
@@ -894,7 +991,6 @@ import gsap from 'gsap';
 
   // ─── Event Handlers ────────────────────────────────────────────────────────
 
-  // Throttled mouse handler using RAF
   const handleMouseMove = throttleRAF((e: MouseEvent) => {
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
@@ -902,50 +998,37 @@ import gsap from 'gsap';
   });
 
   // Gallery item click handlers
-  // Replace or augment your existing click handler:
-  allItems.forEach(item => {
+  for (const item of allItems) {
     item.addEventListener('click', (e) => {
-      // Prevent overlay from triggering if clicking on project detail list items
-      if (e.target.closest('.detail-list-item')) return;
+      if ((e.target as HTMLElement).closest('.detail-list-item')) return;
 
       const projectId = item.dataset.projectId;
-      const globalIndex = parseInt(item.dataset.globalIndex || '0');
-
       if (!projectId) return;
 
       if (!isProjectOpen) {
-        // Existing behavior: open project detail view
         openProject(projectId, item);
       } else {
-        // If project detail is open and clicking a visible gallery item below
-        const itemRow = parseInt(item.dataset.row || '0');
+        const itemRow = itemRowCache.get(item) ?? 0;
         if (itemRow > clickedRowIndex) {
           closeProject(true);
-          setTimeout(() => {
-            openProject(projectId, item);
-          }, 50);
+          setTimeout(() => openProject(projectId, item), 50);
         }
       }
-
     });
-  });
+  }
 
-  // Sidebar list click handlers
-  document.querySelectorAll('.detail-list-item').forEach(item => {
+  // Sidebar list click handlers (use cached node list)
+  for (const item of detailListItemsCache) {
     item.addEventListener('click', () => {
-      const projectId = (item as HTMLElement).dataset.projectId;
-      if (projectId) {
-        transitionToProject(projectId);
-      }
-
+      const projectId = item.dataset.projectId;
+      if (projectId) transitionToProject(projectId);
     });
 
-    // Hover preview in sidebar
     item.addEventListener('mouseenter', () => {
-      const projectId = (item as HTMLElement).dataset.projectId;
-      if (projectId) showSidebarPreview(projectId, item as HTMLElement);
+      const projectId = item.dataset.projectId;
+      if (projectId) showSidebarPreview(projectId, item);
     });
-  });
+  }
 
   document.querySelector('.project-list-container')?.addEventListener('mouseleave', hideSidebarPreview);
 
@@ -957,16 +1040,14 @@ import gsap from 'gsap';
   function showSidebarPreview(projectId: string, listItem: HTMLElement) {
     if (activeSidebarPreviewId === projectId) return;
 
-    // Reset previous list item opacity (but keep current project highlighted)
     if (activeSidebarListItem && activeSidebarListItem.dataset.projectId !== currentProjectId) {
-      gsap.to(activeSidebarListItem, { opacity: getMutedOpacity()});
+      gsap.to(activeSidebarListItem, { opacity: getMutedOpacity() });
     }
 
-    // Hide previous preview (use cache instead of querySelector)
     if (activeSidebarPreviewId) {
       const prevPreview = previewCache.get(activeSidebarPreviewId);
       if (prevPreview) {
-        gsap.to(prevPreview, { opacity: 0,duration: 0.01 });
+        gsap.to(prevPreview, { opacity: 0, duration: 0.01 });
         const video = prevPreview.querySelector('mux-player') as HTMLElement & { pause: () => void };
         if (video) video.pause();
       }
@@ -975,22 +1056,19 @@ import gsap from 'gsap';
     activeSidebarPreviewId = projectId;
     activeSidebarListItem = listItem;
 
-    // Highlight current list item
     gsap.to(listItem, { opacity: 1, duration: 0.4, ease: EASE });
 
-    // Show new preview (use cache)
     const newPreview = previewCache.get(projectId);
     if (newPreview) {
-      gsap.to(newPreview, { opacity: 1, duration: 0.01});
+      gsap.to(newPreview, { opacity: 1, duration: 0.01 });
       const video = newPreview.querySelector('mux-player') as HTMLElement & { play: () => void };
       if (video) video.play();
     }
   }
 
   function hideSidebarPreview() {
-    // Reset list item opacity (but keep current project highlighted)
     if (activeSidebarListItem && activeSidebarListItem.dataset.projectId !== currentProjectId) {
-      gsap.to(activeSidebarListItem, { opacity: getMutedOpacity()});
+      gsap.to(activeSidebarListItem, { opacity: getMutedOpacity() });
     }
     activeSidebarListItem = null;
 
@@ -1005,11 +1083,10 @@ import gsap from 'gsap';
     activeSidebarPreviewId = null;
   }
 
-  // ─── Original Hover Logic ──────────────────────────────────────────────────
+  // ─── Hover Logic ───────────────────────────────────────────────────────────
 
   window.addEventListener('mousemove', handleMouseMove);
 
-  // Throttled scroll handler
   const handleScroll = throttleRAF(() => {
     if (lastMouseX === 0 && lastMouseY === 0) return;
     updateHoverAtPoint(lastMouseX, lastMouseY);
@@ -1019,24 +1096,26 @@ import gsap from 'gsap';
   function resetAll() {
     if (activeRowIndex === -1) return;
 
-    // Determine the first visible index for reset logic (handles last-row-open case)
-    const firstVisibleIndex = isProjectOpen && clickedRowIndex >= allWrappers.length - 1 ? 0 : (isProjectOpen ? clickedRowIndex + 1 : 0);
-    allRows.forEach((row, i) => {
-      // Skip hidden rows when project is open
-      if (isProjectOpen && i < firstVisibleIndex) return;
-      resetRow(row);
-    });
+    const firstVisibleIndex = isProjectOpen
+      ? (clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1)
+      : 0;
+
+    for (let i = 0; i < allRows.length; i++) {
+      if (isProjectOpen && i < firstVisibleIndex) continue;
+      resetRow(allRows[i]);
+    }
     activeRowIndex = -1;
 
-    allWrappers.forEach((wrp, i) => {
-      // Skip hidden wrappers when project is open
-      if (isProjectOpen && i < firstVisibleIndex) return;
-      gsap.to(wrp, { y: 0, duration: DURATION, ease: EASE, overwrite: 'auto' });
-    });
+    for (let i = 0; i < allWrappers.length; i++) {
+      if (isProjectOpen && i < firstVisibleIndex) continue;
+      const wrp = allWrappers[i];
+      if (Math.abs(getWrapperY(wrp)) > 0.5) {
+        setWrapperYAnimated(wrp, 0);
+      }
+    }
   }
 
   function updateHoverAtPoint(clientX: number, clientY: number) {
-    // Skip hover updates during animation
     if (allRows.length === 0 || isAnimating) return;
 
     const cRect = container.getBoundingClientRect();
@@ -1046,16 +1125,17 @@ import gsap from 'gsap';
       return;
     }
 
-    // When project is open, check if mouse is within visible rows bounds
+    // Compute first visible index once
+    const firstVisibleIndex = isProjectOpen
+      ? (clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1)
+      : 0;
+
     if (isProjectOpen && clickedRowIndex >= 0) {
-      // If the opened project is in the last row, treat all rows as visible (start at 0)
-      const firstVisibleIndexForHover = clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1;
-      const firstVisibleWrapper = allWrappers[firstVisibleIndexForHover];
+      const firstVisibleWrapper = allWrappers[firstVisibleIndex];
       if (firstVisibleWrapper) {
         const visibleTop = firstVisibleWrapper.getBoundingClientRect().top;
         const visibleBottom = allWrappers[allWrappers.length - 1].getBoundingClientRect().bottom;
 
-        // If mouse is above the visible rows (e.g., over project detail), reset hover
         if (clientY < visibleTop - 40 || clientY > visibleBottom + 40) {
           resetAll();
           return;
@@ -1067,11 +1147,8 @@ import gsap from 'gsap';
     let minDistance = Infinity;
     let closestIndex = -1;
 
-    // Determine the first visible row index for iteration (handles last-row-open case)
-    const firstVisibleIndexForLoop = isProjectOpen && clickedRowIndex >= allWrappers.length - 1 ? 0 : (isProjectOpen ? clickedRowIndex + 1 : 0);
     for (let i = 0; i < allRows.length; i++) {
-      // Skip rows that are above the visible start when project is open
-      if (isProjectOpen && i < firstVisibleIndexForLoop) continue;
+      if (isProjectOpen && i < firstVisibleIndex) continue;
 
       const row = allRows[i];
       const rect = row.getBoundingClientRect();
@@ -1092,35 +1169,29 @@ import gsap from 'gsap';
 
     const targetRowIndex = hoveredIndex !== -1 ? hoveredIndex : closestIndex;
 
-    // If no valid row found, or target is in hidden rows when project is open
-    // Determine the first visible index for validation (handles last-row-open case)
-    const firstVisibleIndexForValidation = isProjectOpen ? (clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1) : 0;
-    if (targetRowIndex === -1 || (isProjectOpen && targetRowIndex < firstVisibleIndexForValidation)) {
+    if (targetRowIndex === -1 || (isProjectOpen && targetRowIndex < firstVisibleIndex)) {
       resetAll();
       return;
     }
 
-    // If not directly hovering a row and too far from the closest one, reset
-    // This handles when mouse is over project detail (above visible rows)
     if (hoveredIndex === -1 && minDistance > 100) {
       resetAll();
       return;
     }
 
-    // Use correct first/last visible wrappers when project is open
-    // If the opened project is in the last row, treat all rows as visible (start at 0)
-    const firstVisibleIndex = isProjectOpen ? (clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1) : 0;
     const firstWrapper = allWrappers[firstVisibleIndex];
     const lastWrapper = allWrappers[allWrappers.length - 1];
 
-    // If no visible wrappers, reset and return
     if (!firstWrapper) {
       resetAll();
       return;
     }
 
-    const staticTopBounds = firstWrapper.getBoundingClientRect().top - (gsap.getProperty(firstWrapper, 'y') as number || 0);
-    const staticBottomBounds = lastWrapper.getBoundingClientRect().bottom - (gsap.getProperty(lastWrapper, 'y') as number || 0);
+    // Use cached y values instead of gsap.getProperty()
+    const firstWrapperY = getWrapperY(firstWrapper);
+    const lastWrapperY = getWrapperY(lastWrapper);
+    const staticTopBounds = firstWrapper.getBoundingClientRect().top - firstWrapperY;
+    const staticBottomBounds = lastWrapper.getBoundingClientRect().bottom - lastWrapperY;
     const visualTop = allRows[firstVisibleIndex].getBoundingClientRect().top;
     const visualBottom = allRows[allRows.length - 1].getBoundingClientRect().bottom;
 
@@ -1128,8 +1199,8 @@ import gsap from 'gsap';
     const effectiveBottom = Math.max(visualBottom, staticBottomBounds);
 
     if (clientY < effectiveTop - 40 || clientY > effectiveBottom + 40) {
-       resetAll();
-       return;
+      resetAll();
+      return;
     }
 
     const targetRow = allRows[targetRowIndex];
@@ -1137,113 +1208,102 @@ import gsap from 'gsap';
     const n = items.length;
 
     const wrapper = allWrappers[targetRowIndex];
-    const currentY = gsap.getProperty(wrapper, 'y') as number || 0;
+    const currentY = getWrapperY(wrapper);
     const staticTop = wrapper.getBoundingClientRect().top - currentY;
     const staticHeight = wrapper.offsetHeight;
 
     let cursorYNorm = (clientY - staticTop) / staticHeight;
     cursorYNorm = Math.max(0, Math.min(1, cursorYNorm));
 
-
-
-    // Factor for row below (when cursor near bottom)
+    // Vertical bleed factors
     let verticalFactor = 0;
     if (cursorYNorm > VERTICAL_THRESHOLD) {
-      let progress = (cursorYNorm - VERTICAL_THRESHOLD) / (1 - VERTICAL_THRESHOLD);
-      verticalFactor = Math.pow(progress, CURVE_POWER) * INTENSITY_MULTIPLIER;
-      verticalFactor = Math.min(1, verticalFactor);
+      const progress = (cursorYNorm - VERTICAL_THRESHOLD) / (1 - VERTICAL_THRESHOLD);
+      verticalFactor = Math.min(1, Math.pow(progress, CURVE_POWER) * INTENSITY_MULTIPLIER);
     }
 
-    // Factor for row above (when cursor near top)
     let aboveVerticalFactor = 0;
-    const ABOVE_THRESHOLD = 0.05; // 0.25 when VERTICAL_THRESHOLD is 0.75
+    const ABOVE_THRESHOLD = 0.05;
     if (cursorYNorm < ABOVE_THRESHOLD) {
-      let progress = (ABOVE_THRESHOLD - cursorYNorm) / ABOVE_THRESHOLD;
-      aboveVerticalFactor = Math.pow(progress, CURVE_POWER) * INTENSITY_MULTIPLIER;
-      aboveVerticalFactor = Math.min(1, aboveVerticalFactor);
+      const progress = (ABOVE_THRESHOLD - cursorYNorm) / ABOVE_THRESHOLD;
+      aboveVerticalFactor = Math.min(1, Math.pow(progress, CURVE_POWER) * INTENSITY_MULTIPLIER);
     }
 
     const rect = targetRow.getBoundingClientRect();
     const cursorPos = ((clientX - rect.left) / rect.width) * n;
-    const horizontalWeights = getWeights(cursorPos, n);
+
+    // Fill weights buffer in place (no allocation)
+    weightsBuffer.length = n;
+    for (let j = 0; j < n; j++) {
+      weightsBuffer[j] = Math.pow(FALLOFF, Math.abs(cursorPos - (j + 0.5)));
+    }
 
     const nextRowIndex = targetRowIndex + 1;
     const hasNextRow = nextRowIndex < allRows.length;
 
     const prevRowIndex = targetRowIndex - 1;
-    const hasPrevRow = prevRowIndex >= (isProjectOpen ? clickedRowIndex + 1 : 0);
+    const hasPrevRow = prevRowIndex >= firstVisibleIndex;
 
-    allRows.forEach((row, i) => {
+    // Reset rows that are not target/prev/next
+    for (let i = 0; i < allRows.length; i++) {
       if (i !== targetRowIndex && i !== nextRowIndex && i !== prevRowIndex) {
-        resetRow(row);
+        resetRow(allRows[i]);
       }
-    });
+      gsap.set(allRows[i], {
+        zIndex: (i === targetRowIndex || i === nextRowIndex || i === prevRowIndex) ? 10 : 'auto'
+      });
+    }
 
-    allRows.forEach((row, i) => {
-      gsap.set(row, { zIndex: (i === targetRowIndex || i === nextRowIndex || i === prevRowIndex) ? 10 : 'auto' });
-    });
-
-    animateItems(targetRow, horizontalWeights);
-    updateEdgeFade(targetRow, { clientX, clientY } as MouseEvent, n);
+    animateItems(targetRow, weightsBuffer);
+    updateEdgeFade(targetRow, clientX, n);
 
     if (hasNextRow) {
-      const nextRow = allRows[nextRowIndex];
-      const nextWeights = horizontalWeights.map(w => 1 + (w - 1) * verticalFactor);
-      animateItems(nextRow, nextWeights);
+      altWeightsBuffer.length = n;
+      for (let j = 0; j < n; j++) {
+        altWeightsBuffer[j] = 1 + (weightsBuffer[j] - 1) * verticalFactor;
+      }
+      animateItems(allRows[nextRowIndex], altWeightsBuffer);
     }
 
     if (hasPrevRow) {
-      const prevRow = allRows[prevRowIndex];
-      const prevWeights = horizontalWeights.map(w => 1 + (w - 1) * aboveVerticalFactor);
-      animateItems(prevRow, prevWeights);
+      // Reuse altWeightsBuffer for prev row (sequential, not concurrent)
+      altWeightsBuffer.length = n;
+      for (let j = 0; j < n; j++) {
+        altWeightsBuffer[j] = 1 + (weightsBuffer[j] - 1) * aboveVerticalFactor;
+      }
+      animateItems(allRows[prevRowIndex], altWeightsBuffer);
     }
 
-    const activeDelta = calcMaxDelta(targetRowIndex);
-    const belowDelta = hasNextRow ? calcMaxDelta(nextRowIndex) * verticalFactor : 0;
-    const aboveDelta = hasPrevRow ? calcMaxDelta(prevRowIndex) * aboveVerticalFactor : 0;
+    const activeDelta = cachedMaxDeltas[targetRowIndex] ?? 0;
+    const belowDelta = hasNextRow ? (cachedMaxDeltas[nextRowIndex] ?? 0) * verticalFactor : 0;
+    const aboveDelta = hasPrevRow ? (cachedMaxDeltas[prevRowIndex] ?? 0) * aboveVerticalFactor : 0;
 
-    // Only animate wrappers that need to change
-    allWrappers.forEach((wrp, i) => {
-      // Skip wrappers that are hidden when project is open (respect computed firstVisibleIndex)
-
+    // Animate wrapper y (using cached y + quickTo)
+    for (let i = 0; i < allWrappers.length; i++) {
+      const wrp = allWrappers[i];
 
       let yPush = 0;
 
       if (i < targetRowIndex) {
         yPush = -activeDelta;
-        // Rows above the prevRow also need to account for prevRow expansion
         if (i < prevRowIndex) {
-
-            yPush = -aboveDelta-activeDelta
-
+          yPush = -aboveDelta - activeDelta;
         }
       } else if (i === targetRowIndex) {
-
         yPush = -belowDelta;
       }
 
-      // Only animate if value changed
-      const currentY = gsap.getProperty(wrp, 'y') as number || 0;
-      if (Math.abs(currentY - yPush) > 0.5) {
-        gsap.to(wrp, {
-          y: yPush,
-          duration: DURATION,
-          ease: EASE,
-          overwrite: 'auto'
-        });
+      const cur = getWrapperY(wrp);
+      if (Math.abs(cur - yPush) > 0.5) {
+        setWrapperYAnimated(wrp, yPush);
       }
-    });
+    }
 
     activeRowIndex = targetRowIndex;
   }
 
   function getAspects(row: HTMLElement): number[] {
-    const items = rowItemsCache.get(row) || [];
-    return items.map(item => itemAspectsCache.get(item) || 1);
-  }
-
-  function getWeights(cursorPos: number, n: number): number[] {
-    return Array.from({ length: n }, (_, j) => Math.pow(FALLOFF, Math.abs(cursorPos - (j + 0.5))));
+    return rowAspectsCache.get(row) || [];
   }
 
   function calcBaseHeight(rowIndex: number): number {
@@ -1252,7 +1312,12 @@ import gsap from 'gsap';
     const n = aspects.length;
     const available = width - (n - 1) * ITEM_GAP_PX;
     const baseW = available / n;
-    return Math.max(...aspects.map((a) => baseW * a));
+    let max = 0;
+    for (let j = 0; j < n; j++) {
+      const v = baseW * aspects[j];
+      if (v > max) max = v;
+    }
+    return max;
   }
 
   function calcMaxDelta(rowIndex: number): number {
@@ -1262,56 +1327,76 @@ import gsap from 'gsap';
     const available = width - (n - 1) * ITEM_GAP_PX;
     const baseH = calcBaseHeight(rowIndex);
 
-    const samplePositions = [0, n, ...Array.from({ length: n }, (_, j) => j + 0.5)];
+    const samplePositions: number[] = [0, n];
+    for (let j = 0; j < n; j++) samplePositions.push(j + 0.5);
+
     let maxDelta = 0;
+    const tmpWeights: number[] = new Array(n);
+
     for (const cursorPos of samplePositions) {
-      const weights = getWeights(cursorPos, n);
-      const sum = weights.reduce((a, b) => a + b, 0);
-      const maxNewH = Math.max(...aspects.map((a, j) => ((available * weights[j]) / sum) * a));
-      maxDelta = Math.max(maxDelta, maxNewH - baseH);
+      let sum = 0;
+      for (let j = 0; j < n; j++) {
+        tmpWeights[j] = Math.pow(FALLOFF, Math.abs(cursorPos - (j + 0.5)));
+        sum += tmpWeights[j];
+      }
+      let maxNewH = 0;
+      for (let j = 0; j < n; j++) {
+        const v = ((available * tmpWeights[j]) / sum) * aspects[j];
+        if (v > maxNewH) maxNewH = v;
+      }
+      const delta = maxNewH - baseH;
+      if (delta > maxDelta) maxDelta = delta;
     }
     return Math.max(0, maxDelta);
   }
 
+  function precomputeMaxDeltas() {
+    cachedMaxDeltas = allWrappers.map((_, i) => calcMaxDelta(i));
+  }
+
   function lockHeights() {
-    allRows.forEach((row) => {
-      row.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
+    for (const row of allRows) {
+      const items = rowItemsCache.get(row) || [];
+      for (const item of items) {
         item.style.flexGrow = '1';
-      });
-    });
-    allRows.forEach((row, i) => {
-      allWrappers[i].style.height = `${row.getBoundingClientRect().height}px`;
-    });
+      }
+    }
+    for (let i = 0; i < allRows.length; i++) {
+      allWrappers[i].style.height = `${allRows[i].getBoundingClientRect().height}px`;
+    }
   }
 
   function fadeEdge(items: HTMLElement[]) {
-    items.forEach((item) => {
+    for (const item of items) {
       const overlay = item.querySelector('.title-fade-overlay') as HTMLElement;
       if (overlay) gsap.to(overlay, { opacity: 1, duration: DURATION_ALT, ease: EASE, overwrite: 'auto' });
-    });
+    }
   }
 
   function restoreEdge(items: HTMLElement[]) {
-    items.forEach((item) => {
+    for (const item of items) {
       const overlay = item.querySelector('.title-fade-overlay') as HTMLElement;
       if (overlay) gsap.to(overlay, { opacity: 0, duration: DURATION_ALT, ease: EASE, overwrite: 'auto' });
-    });
+    }
   }
 
-  function updateEdgeFade(row: HTMLElement, e: MouseEvent, n: number) {
-    const items = [...row.querySelectorAll<HTMLElement>('.gallery-item')];
+  function updateEdgeFade(row: HTMLElement, clientX: number, n: number) {
+    const items = rowItemsCache.get(row) || [];
     const previousFadedItems = fadedEdge.get(row) ?? [];
 
     const rect = row.getBoundingClientRect();
-    const isLeftHalf = (e.clientX - rect.left) < rect.width / 2;
+    const isLeftHalf = (clientX - rect.left) < rect.width / 2;
 
     const currentTargetItems: HTMLElement[] = isLeftHalf
       ? [items[n - 1], items[n - 2]].filter(Boolean)
       : [items[0], items[1]].filter(Boolean);
 
-    const isChanged =
-      currentTargetItems.length !== previousFadedItems.length ||
-      currentTargetItems.some((item, i) => item !== previousFadedItems[i]);
+    let isChanged = currentTargetItems.length !== previousFadedItems.length;
+    if (!isChanged) {
+      for (let i = 0; i < currentTargetItems.length; i++) {
+        if (currentTargetItems[i] !== previousFadedItems[i]) { isChanged = true; break; }
+      }
+    }
 
     if (isChanged) {
       if (previousFadedItems.length > 0) restoreEdge(previousFadedItems);
@@ -1332,11 +1417,12 @@ import gsap from 'gsap';
   // SINGLE VIEW OVERLAY LOGIC
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SINGLE VIEW OVERLAY LOGIC
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  let overlayState = {
+  let overlayState: {
+    isOpen: boolean;
+    projectId: string | null;
+    currentIndex: number;
+    mediaItems: any[];
+  } = {
     isOpen: false,
     projectId: null,
     currentIndex: 0,
@@ -1350,21 +1436,19 @@ import gsap from 'gsap';
   const overlayPrev = document.getElementById('overlay-prev');
   const overlayNext = document.getElementById('overlay-next');
 
-  function buildMediaItems(project) {
-    const items = [];
+  function buildMediaItems(project: any): any[] {
+    const items: any[] = [];
 
-    // Index 0: Thumbnail
     if (project.muxID && !project.thumbnailUrl) {
       items.push({ type: 'video', playbackId: project.muxID, alt: project.name, _key: 'thumbnail' });
     } else if (project.thumbnailUrl) {
       items.push({ type: 'image', url: project.thumbnailUrl, alt: project.name, _key: 'thumbnail' });
     }
 
-    // Index 1+: Gallery images
     if (project.galleryUrls?.length) {
-      project.galleryUrls.forEach(img => {
+      for (const img of project.galleryUrls) {
         items.push({ type: 'image', url: img.url, alt: project.name, _key: img._key });
-      });
+      }
     }
 
     return items;
@@ -1401,51 +1485,36 @@ import gsap from 'gsap';
       overlayPagination.textContent = `${overlayState.currentIndex + 1}/${overlayState.mediaItems.length}`;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // FIX: Reset inline styles for ALL nav items to allow CSS Hovers
-    // ═══════════════════════════════════════════════════════════════
+    // Reset inline styles for nav items
     const allNavItems = [overlayExit, overlayPrev, overlayNext, overlayPagination];
 
-    allNavItems.forEach(el => {
+    for (const el of allNavItems) {
       if (el) {
-        // 1. Clear the inline opacity left by the close animation
         el.style.opacity = '';
-
-        // 2. Ensure pointer events are re-enabled (unless specifically disabled below)
         if (el !== overlayPrev && el !== overlayNext) {
-            el.style.pointerEvents = 'auto';
+          el.style.pointerEvents = 'auto';
         }
       }
-    });
+    }
 
-    // ═══════════════════════════════════════════════════════════════
-    // FIX: Use Classes instead of Inline Styles for Disabled State
-    // ═══════════════════════════════════════════════════════════════
-
-    // Handle Previous Button
     if (overlayPrev) {
       if (overlayState.currentIndex === 0) {
-        // Disabled state: Remove hover classes, add muted class
         overlayPrev.classList.remove('opacity-100', 'hover:opacity-muted');
         overlayPrev.classList.add('opacity-muted');
-        overlayPrev.style.pointerEvents = 'none'; // Disable clicking
+        overlayPrev.style.pointerEvents = 'none';
       } else {
-        // Active state: Add hover classes
         overlayPrev.classList.remove('opacity-muted');
         overlayPrev.classList.add('opacity-100', 'hover:opacity-muted');
         overlayPrev.style.pointerEvents = 'auto';
       }
     }
 
-    // Handle Next Button
     if (overlayNext) {
       if (overlayState.currentIndex === overlayState.mediaItems.length - 1) {
-        // Disabled state
         overlayNext.classList.remove('opacity-100', 'hover:opacity-muted');
         overlayNext.classList.add('opacity-muted');
         overlayNext.style.pointerEvents = 'none';
       } else {
-        // Active state
         overlayNext.classList.remove('opacity-muted');
         overlayNext.classList.add('opacity-100', 'hover:opacity-muted');
         overlayNext.style.pointerEvents = 'auto';
@@ -1453,37 +1522,27 @@ import gsap from 'gsap';
     }
   }
 
-  function openOverlay(projectId, startIndex = 0) {
+  function openOverlay(projectId: string, startIndex = 0) {
     const project = getProjectById(projectId);
     if (!project || !overlay) return;
 
-    // Pause gallery videos to avoid audio overlap
-    document.querySelectorAll('mux-player').forEach(player => {
+    document.querySelectorAll<HTMLElement & { pause: () => void }>('mux-player').forEach(player => {
       if (player.pause) player.pause();
     });
 
-    // Set state BEFORE animation
     overlayState.projectId = projectId;
     overlayState.mediaItems = buildMediaItems(project);
     overlayState.currentIndex = Math.max(0, Math.min(startIndex, overlayState.mediaItems.length - 1));
     overlayState.isOpen = true;
 
-    // Prevent body scroll immediately
     document.body.style.overflow = 'hidden';
 
-    // Show overlay container (but keep children hidden for animation)
     overlay.classList.remove('hidden');
 
-    // Force reflow so transitions work
     void overlay.offsetHeight;
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // STAGGERED ANIMATION TIMELINE
-    // ═══════════════════════════════════════════════════════════════════════
 
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
 
-    // Step 1: Fade in overlay background
     tl.to(overlay, {
       opacity: 1,
       duration: 0.3,
@@ -1492,16 +1551,15 @@ import gsap from 'gsap';
       }
     });
 
-    // Step 2: Render media, then fade + scale it in
     tl.call(() => {
       renderOverlayMedia();
-    }, null, 0.25)
-    .to('#overlay-media-container', {
-      delay: 0.5,
-      opacity: 1,
-      duration: 0.4,
-      ease: 'power2.out'
-    }, 0.25);
+    }, undefined, 0.25)
+      .to('#overlay-media-container', {
+        delay: 0.5,
+        opacity: 1,
+        duration: 0.4,
+        ease: 'power2.out'
+      }, 0.25);
   }
 
   function closeOverlay() {
@@ -1509,21 +1567,15 @@ import gsap from 'gsap';
 
     overlayState.isOpen = false;
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // REVERSE ANIMATION TIMELINE
-    // ═══════════════════════════════════════════════════════════════════════
-
     const tl = gsap.timeline({
       defaults: { ease: 'power3.in' },
       onComplete: () => {
-        // Final cleanup after animation
         overlay.classList.add('hidden');
         overlay.style.pointerEvents = 'none';
-        overlayMediaContainer.innerHTML = ''; // Clean up media
-        document.body.style.overflow = ''; // Restore scroll
+        if (overlayMediaContainer) overlayMediaContainer.innerHTML = '';
+        document.body.style.overflow = '';
 
-        // Resume gallery videos that should autoplay on hover
-        document.querySelectorAll('.gallery-item mux-player').forEach(player => {
+        document.querySelectorAll<HTMLElement & { play: () => void }>('.gallery-item mux-player').forEach(player => {
           if (player.play && player.closest('.gallery-item:hover')) {
             player.play();
           }
@@ -1531,30 +1583,23 @@ import gsap from 'gsap';
       }
     });
 
-    // Step 1: Fade out navigation items (reverse stagger)
-    const navItems = [
-      overlayExit, overlayPrev, overlayNext, overlayPagination
-    ].filter(el => el);
+    const navItems = [overlayExit, overlayPrev, overlayNext, overlayPagination].filter(el => el) as HTMLElement[];
 
     tl.to(navItems, {
       opacity: 0,
-
       duration: 0.25,
       stagger: {
         each: 0.05,
-        from: 'end', // Right to left on close
+        from: 'end',
         ease: 'power2.in'
       },
-
     });
 
-    // Step 2: Fade + scale out media (0.15s after nav starts)
     tl.to('#overlay-media-container', {
       opacity: 0,
       duration: 0.3
     }, 0.15);
 
-    // Step 3: Fade out overlay background (last)
     tl.to(overlay, {
       opacity: 0,
       duration: 0.6,
@@ -1576,7 +1621,6 @@ import gsap from 'gsap';
     }
   }
 
-  // ─── Overlay Control Event Listeners ─────────────────────────────────────
   if (overlayExit) {
     overlayExit.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1598,7 +1642,6 @@ import gsap from 'gsap';
     });
   }
 
-  // Keyboard navigation
   document.addEventListener('keydown', (e) => {
     if (!overlayState.isOpen) return;
 
@@ -1614,7 +1657,6 @@ import gsap from 'gsap';
     }
   });
 
-  // Click outside media to close
   if (overlay) {
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) {
@@ -1623,19 +1665,17 @@ import gsap from 'gsap';
     });
   }
 
-  // ─── Attach Click Handlers to Detail Gallery Images ──────────────────────
-  let detailGalleryListenerAttached = false; // ← Prevent duplicate listeners
+  // ─── Detail Gallery Click Listener (event delegation) ─────────────────────
+  let detailGalleryListenerAttached = false;
 
   function attachDetailGalleryListeners() {
     if (!detailImageGallery || detailGalleryListenerAttached) return;
 
-    detailGalleryListenerAttached = true; // ← Mark as attached
+    detailGalleryListenerAttached = true;
 
-    // Use event delegation on the container
     detailImageGallery.addEventListener('click', (e) => {
-      // Find the clicked slot
-      const slot = e.target.closest('#detail-first-image, .col-span-1.w-full.overflow-hidden');
-      if (!slot) return; // ← Removed: || !overlayState.isOpen
+      const slot = (e.target as HTMLElement).closest('#detail-first-image, .col-span-1.w-full.overflow-hidden');
+      if (!slot) return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -1646,61 +1686,34 @@ import gsap from 'gsap';
         return;
       }
 
-      // Get project data
       const project = getProjectById(projectId);
       if (!project) return;
 
-      // Build media items array (same as overlay logic)
-      const mediaItems = [];
-      if (project.muxID && !project.thumbnailUrl) {
-        mediaItems.push({ type: 'video', playbackId: project.muxID, _key: 'thumbnail' });
-      } else if (project.thumbnailUrl) {
-        mediaItems.push({ type: 'image', url: project.thumbnailUrl, _key: 'thumbnail' });
-      }
-      if (project.galleryUrls?.length) {
-        project.galleryUrls.forEach(img => {
-          mediaItems.push({ type: 'image', url: img.url, _key: img._key });
-        });
-      }
-
-      // Determine clicked index
       let clickedIndex = 0;
       if (slot.id !== 'detail-first-image') {
         const slots = [...detailImageGallery.querySelectorAll('#detail-first-image, .col-span-1.w-full.overflow-hidden')];
         clickedIndex = Math.max(0, slots.indexOf(slot));
       }
 
-      // ← OPEN the overlay (this was the main bug!)
       openOverlay(projectId, clickedIndex);
-    }, { once: false }); // ← Ensure listener persists
+    });
   }
 
   function animateItems(row: HTMLElement, weights: number[]) {
-    // Generate a key for this weight configuration to avoid redundant animations
-    const weightsKey = `${allRows.indexOf(row)}-${weights.map(w => w.toFixed(2)).join(',')}`;
-    if (weightsKey === lastWeightsKey && allRows.indexOf(row) === lastTargetRowIndex) {
-      return; // Skip if same animation
-    }
-    lastWeightsKey = weightsKey;
-    lastTargetRowIndex = allRows.indexOf(row);
-
     const items = rowItemsCache.get(row) || [];
-    items.forEach((item, j) => {
-      // Use gsap.to directly with overwrite instead of creating timelines
-      gsap.to(item, {
-        flexGrow: weights[j],
-        duration: DURATION_ALT,
-        ease: EASE,
-        overwrite: true,
-      });
-    });
+    const len = Math.min(items.length, weights.length);
+    for (let j = 0; j < len; j++) {
+      const setter = itemFlexQuickTo.get(items[j]);
+      if (setter) setter(weights[j]);
+    }
   }
 
   function resetRow(row: HTMLElement) {
     const items = rowItemsCache.get(row) || [];
-    items.forEach((item) => {
-      gsap.to(item, { flexGrow: 1, duration: DURATION_ALT, ease: EASE, overwrite: true });
-    });
+    for (const item of items) {
+      const setter = itemFlexQuickTo.get(item);
+      if (setter) setter(1);
+    }
     clearEdgeFade(row);
     gsap.set(row, { zIndex: 'auto' });
   }
@@ -1715,23 +1728,35 @@ import gsap from 'gsap';
       }
 
       lockHeights();
+      precomputeMaxDeltas();
 
-      const deltas = allWrappers.map((_, i) => calcMaxDelta(i)).filter(d => isFinite(d) && !isNaN(d));
+      const deltas = cachedMaxDeltas.filter(d => isFinite(d) && !isNaN(d));
       const maxDelta = deltas.length > 0 ? Math.max(...deltas) : 0;
       gsap.set(container, { y: maxDelta + 20 });
 
-      container.querySelectorAll<HTMLElement>('.gallery-item').forEach((item) => {
+      // Reveal once layout is finalised. Inline visibility/opacity prevent
+      // the pre-init "stack of overlapping rows" flash on navigation in.
+      container.style.visibility = 'visible';
+      gsap.to(container, { opacity: 1, duration: 0.4, ease: 'power2.out' });
+
+      const footer = document.getElementById('desktop-footer');
+      if (footer) {
+        footer.style.visibility = 'visible';
+        gsap.to(footer, { opacity: 1, duration: 0.4, ease: 'power2.out' });
+      }
+
+      // Hover-driven video play/pause
+      for (const item of allItems) {
         const video = item.querySelector('mux-player') as (HTMLVideoElement & { play: () => void; pause: () => void }) | null;
-        if (!video) return;
+        if (!video) continue;
         item.addEventListener('mouseenter', () => video.play());
         item.addEventListener('mouseleave', () => video.pause());
-      });
+      }
     } catch (e) {
       console.error('Error initializing gallery:', e);
     }
   }
 
-  // Wait for DOM to be ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
@@ -1743,29 +1768,26 @@ import gsap from 'gsap';
   window.addEventListener('resize', () => {
     if (resizeTimeout) clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
-      // Reset weight tracking caches on resize (layout changed)
-      lastWeightsKey = '';
-      lastTargetRowIndex = -1;
-
       if (!isProjectOpen) {
-        init();
+        init(); // Re-runs lockHeights + precomputeMaxDeltas
+      } else {
+        // Just refresh max deltas if a project is open (don't disturb layout)
+        precomputeMaxDeltas();
       }
-    }, 150); // 150ms debounce
+    }, 150);
   });
 
   // ─── Theme Change Listener ─────────────────────────────────────────────────
   window.addEventListener('themechange', () => {
     const newOpacity = getMutedOpacity();
 
-    // Update sidebar list items (non-active ones)
-    document.querySelectorAll('.detail-list-item').forEach(item => {
-      const itemId = (item as HTMLElement).dataset.projectId;
+    for (const item of detailListItemsCache) {
+      const itemId = item.dataset.projectId;
       if (itemId !== currentProjectId) {
-        gsap.to(item, { opacity: newOpacity});
+        gsap.to(item, { opacity: newOpacity });
       }
-    });
+    }
 
-    // Update project type opacity
     if (detailProjectType && isProjectOpen) {
       gsap.to(detailProjectType, { opacity: newOpacity });
     }
@@ -1773,5 +1795,389 @@ import gsap from 'gsap';
 
   } // End of else block for DOM element check
 
+  } // End of `if (matchMedia('(min-width: 768px)').matches)` desktop gate
+</script>
 
+<!-- ────────────────────────── Mobile slider script ────────────────────────── -->
+<script>
+  import gsap from 'gsap';
+
+  // Only run the mobile slider below md breakpoint (<768px).
+  if (!matchMedia('(min-width: 768px)').matches) {
+
+  // ── Constants ─────────────────────────────────────────────────────────────
+  const SNAP_THRESHOLD = 80;      // px — below this, snap back to current slide
+  const SLIDE_DURATION = 0.7;
+  const SLIDE_EASE     = 'expo.out';
+
+  // ── DOM refs ──────────────────────────────────────────────────────────────
+  const slider        = document.getElementById('mobile-slider')  as HTMLElement;
+  const track         = document.getElementById('slider-track')   as HTMLElement;
+  const centerInfo    = document.getElementById('center-info')    as HTMLElement;
+  const centerNameEl  = document.getElementById('center-name')    as HTMLElement;
+  const centerIndexEl = document.getElementById('center-index')   as HTMLElement;
+
+  if (!slider || !track) {
+    // Mobile DOM not present (shouldn't happen, but bail gracefully)
+  } else {
+
+  const slides = Array.from(
+    track.querySelectorAll<HTMLElement>('.slider-slide'),
+  );
+
+  const projects: any[] = (window as any).__MOBILE_PROJECTS__ ?? [];
+  const n = projects.length;
+
+  if (n === 0 && centerInfo) {
+    centerInfo.style.display = 'none';
+  }
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let currentVirtualIndex = 1;
+  let currentTranslateY   = 0;
+  let animating           = false;
+  let isDragging          = false;
+  let startY              = 0;
+  let startX              = 0;
+  let startTime           = 0;
+  let startTranslateY     = 0;
+
+  const TAP_MAX_MOVE = 10;
+  const TAP_MAX_TIME = 300;
+
+  function maybeTap(deltaY: number, deltaX: number, elapsed: number): boolean {
+    return (
+      Math.abs(deltaY) < TAP_MAX_MOVE &&
+      Math.abs(deltaX) < TAP_MAX_MOVE &&
+      elapsed < TAP_MAX_TIME
+    );
+  }
+
+  function currentRealIndex(): number {
+    const vi = currentVirtualIndex;
+    return vi === 0 ? n - 1 : vi === n + 1 ? 0 : vi - 1;
+  }
+
+  function sizeSlides(): void {
+    const h = slider.offsetHeight;
+    for (const slide of slides) slide.style.height = `${h}px`;
+  }
+
+  function translateYForVirtual(vi: number): number {
+    return -(vi * slider.offsetHeight);
+  }
+
+  function updateInfoText(vi: number): void {
+    if (n === 0) return;
+    const realIdx = vi === 0 ? n - 1 : vi === n + 1 ? 0 : vi - 1;
+    const project = projects[realIdx];
+    if (!project) return;
+    centerNameEl.textContent  = project.name ?? '';
+    centerIndexEl.textContent = String(
+      typeof project.index === 'number' ? project.index : realIdx + 1,
+    ).padStart(3, '0');
+  }
+
+  function goToVirtual(vi: number, animate = true): void {
+    if (n === 0) return;
+    const targetY = translateYForVirtual(vi);
+    updateInfoText(vi);
+
+    if (animate) {
+      animating = true;
+      currentVirtualIndex = vi;
+      gsap.to(track, {
+        y: targetY,
+        duration: SLIDE_DURATION,
+        ease: SLIDE_EASE,
+        onComplete() {
+          animating         = false;
+          currentTranslateY = targetY;
+          if (vi === 0)     goToVirtual(n, false);
+          if (vi === n + 1) goToVirtual(1, false);
+        },
+      });
+    } else {
+      gsap.set(track, { y: targetY });
+      currentTranslateY   = targetY;
+      currentVirtualIndex = vi;
+    }
+  }
+
+  // ── Touch events ─────────────────────────────────────────────────────────
+  function onTouchStart(e: TouchEvent): void {
+    if (n === 0) return;
+    startY          = e.touches[0].clientY;
+    startX          = e.touches[0].clientX;
+    startTime       = performance.now();
+    startTranslateY = gsap.getProperty(track, 'y') as number;
+    isDragging      = true;
+    gsap.killTweensOf(track);
+    animating = false;
+  }
+
+  function onTouchMove(e: TouchEvent): void {
+    if (!isDragging || n === 0) return;
+    e.preventDefault();
+    gsap.set(track, { y: startTranslateY + (e.touches[0].clientY - startY) });
+  }
+
+  function onTouchEnd(e: TouchEvent): void {
+    if (!isDragging || n === 0) return;
+    isDragging = false;
+    const t  = e.changedTouches[0];
+    const dy = t.clientY - startY;
+    const dx = t.clientX - startX;
+    const dt = performance.now() - startTime;
+
+    if (maybeTap(dy, dx, dt)) {
+      goToVirtual(currentVirtualIndex);
+      openMobileOverlay(currentRealIndex());
+      return;
+    }
+
+    if      (dy < -SNAP_THRESHOLD) goToVirtual(currentVirtualIndex + 1);
+    else if (dy >  SNAP_THRESHOLD) goToVirtual(currentVirtualIndex - 1);
+    else                           goToVirtual(currentVirtualIndex);
+  }
+
+  slider.addEventListener('touchstart', onTouchStart, { passive: true });
+  slider.addEventListener('touchmove',  onTouchMove,  { passive: false });
+  slider.addEventListener('touchend',   onTouchEnd,   { passive: true });
+
+  // ── Pointer events (desktop testing) ─────────────────────────────────────
+  function onPointerDown(e: PointerEvent): void {
+    if (e.pointerType !== 'mouse' || n === 0) return;
+    startY          = e.clientY;
+    startX          = e.clientX;
+    startTime       = performance.now();
+    startTranslateY = gsap.getProperty(track, 'y') as number;
+    isDragging      = true;
+    slider.setPointerCapture(e.pointerId);
+    gsap.killTweensOf(track);
+    animating = false;
+  }
+
+  function onPointerMove(e: PointerEvent): void {
+    if (!isDragging || e.pointerType !== 'mouse' || n === 0) return;
+    gsap.set(track, { y: startTranslateY + (e.clientY - startY) });
+  }
+
+  function onPointerUp(e: PointerEvent): void {
+    if (!isDragging || e.pointerType !== 'mouse' || n === 0) return;
+    isDragging = false;
+    const dy = e.clientY - startY;
+    const dx = e.clientX - startX;
+    const dt = performance.now() - startTime;
+
+    if (maybeTap(dy, dx, dt)) {
+      goToVirtual(currentVirtualIndex);
+      openMobileOverlay(currentRealIndex());
+      return;
+    }
+
+    if      (dy < -SNAP_THRESHOLD) goToVirtual(currentVirtualIndex + 1);
+    else if (dy >  SNAP_THRESHOLD) goToVirtual(currentVirtualIndex - 1);
+    else                           goToVirtual(currentVirtualIndex);
+  }
+
+  function onPointerCancel(e: PointerEvent): void {
+    if (!isDragging || e.pointerType !== 'mouse') return;
+    isDragging = false;
+    goToVirtual(currentVirtualIndex);
+  }
+
+  slider.addEventListener('pointerdown',   onPointerDown);
+  slider.addEventListener('pointermove',   onPointerMove);
+  slider.addEventListener('pointerup',     onPointerUp);
+  slider.addEventListener('pointercancel', onPointerCancel);
+
+  // ── Wheel ────────────────────────────────────────────────────────────────
+  let wheelAccum = 0;
+  let wheelResetTimer: ReturnType<typeof setTimeout> | null = null;
+  const WHEEL_THRESHOLD = 50;
+
+  function onWheel(e: WheelEvent): void {
+    e.preventDefault();
+    if (n === 0) return;
+
+    if (animating) {
+      wheelAccum = 0;
+      if (wheelResetTimer !== null) { clearTimeout(wheelResetTimer); wheelResetTimer = null; }
+      return;
+    }
+
+    wheelAccum += e.deltaY;
+    if (wheelResetTimer !== null) clearTimeout(wheelResetTimer);
+    wheelResetTimer = setTimeout(() => { wheelAccum = 0; }, 200);
+
+    if (Math.abs(wheelAccum) >= WHEEL_THRESHOLD) {
+      const dir = wheelAccum > 0 ? 1 : -1;
+      wheelAccum = 0;
+      if (wheelResetTimer !== null) { clearTimeout(wheelResetTimer); wheelResetTimer = null; }
+      goToVirtual(currentVirtualIndex + dir);
+    }
+  }
+
+  slider.addEventListener('wheel', onWheel, { passive: false });
+
+  // ── Resize ───────────────────────────────────────────────────────────────
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  window.addEventListener('resize', () => {
+    if (resizeTimer !== null) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      sizeSlides();
+      goToVirtual(currentVirtualIndex, false);
+    }, 100);
+  });
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  function init(): void {
+    if (n === 0) return;
+    requestAnimationFrame(() => {
+      sizeSlides();
+      goToVirtual(1, false);
+      updateInfoText(1);
+    });
+  }
+  init();
+
+  // ─── Single-view overlay ──────────────────────────────────────────────────
+  type OverlayMedia =
+    | { type: 'video'; playbackId: string; alt: string }
+    | { type: 'image'; url: string;        alt: string };
+
+  const overlayEl       = document.getElementById('mobile-overlay')           as HTMLElement;
+  const overlayMediaEl  = document.getElementById('mobile-overlay-media')     as HTMLElement;
+  const overlayNameEl   = document.getElementById('mobile-overlay-name')      as HTMLElement;
+  const overlayIndexEl  = document.getElementById('mobile-overlay-index')     as HTMLElement;
+  const overlayCountEl  = document.getElementById('mobile-overlay-counter')   as HTMLElement;
+  const overlayPrevZone = document.getElementById('mobile-overlay-prev-zone') as HTMLElement;
+  const overlayNextZone = document.getElementById('mobile-overlay-next-zone') as HTMLElement;
+  const overlayCloseBtn = document.getElementById('mobile-overlay-close')     as HTMLElement;
+
+  let overlayOpen  = false;
+  let overlayItems: OverlayMedia[] = [];
+  let overlayIndex = 0;
+
+  function buildOverlayItems(project: any): OverlayMedia[] {
+    const items: OverlayMedia[] = [];
+    if (project.muxID && !project.thumbnailUrl) {
+      items.push({ type: 'video', playbackId: project.muxID, alt: project.name ?? '' });
+    } else if (project.thumbnailUrl) {
+      items.push({ type: 'image', url: project.thumbnailUrl, alt: project.name ?? '' });
+    }
+    if (Array.isArray(project.galleryUrls)) {
+      for (const img of project.galleryUrls) {
+        items.push({ type: 'image', url: img.url, alt: project.name ?? '' });
+      }
+    }
+    return items;
+  }
+
+  function renderOverlayMedia(): void {
+    overlayMediaEl.innerHTML = '';
+    const item = overlayItems[overlayIndex];
+    if (!item) return;
+
+    if (item.type === 'video') {
+      const player = document.createElement('mux-player');
+      player.setAttribute('playback-id', item.playbackId);
+      player.setAttribute('autoplay', '');
+      player.setAttribute('loop', '');
+      player.setAttribute('muted', '');
+      player.setAttribute('playsinline', '');
+      player.style.setProperty('--controls', 'none');
+      player.style.width = '100%';
+      player.style.maxHeight = '100%';
+      overlayMediaEl.appendChild(player);
+    } else {
+      const img = document.createElement('img');
+      img.src = item.url;
+      img.alt = item.alt;
+      img.draggable = false;
+      img.className = 'max-w-full max-h-full object-contain block';
+      overlayMediaEl.appendChild(img);
+    }
+
+    overlayCountEl.textContent = `${overlayIndex + 1}/${overlayItems.length}`;
+  }
+
+  function openMobileOverlay(realIdx: number): void {
+    if (n === 0) return;
+    const project = projects[realIdx];
+    if (!project) return;
+
+    overlayItems = buildOverlayItems(project);
+    if (overlayItems.length === 0) return;
+
+    overlayIndex = 0;
+
+    overlayNameEl.textContent  = project.name ?? '';
+    overlayIndexEl.textContent = String(
+      typeof project.index === 'number' ? project.index : realIdx + 1,
+    ).padStart(3, '0');
+
+    overlayEl.classList.remove('hidden');
+    void overlayEl.offsetHeight;
+
+    renderOverlayMedia();
+
+    overlayOpen = true;
+    overlayEl.style.pointerEvents = 'auto';
+
+    gsap.to(overlayEl, { opacity: 1, duration: 0.5, ease: 'power3.out' });
+    gsap.fromTo(
+      overlayMediaEl,
+      { opacity: 0 },
+      { opacity: 1, duration: 1, delay: 0.5, ease: 'power3.out' },
+    );
+  }
+
+  function closeMobileOverlay(): void {
+    if (!overlayOpen) return;
+    overlayOpen = false;
+
+    gsap.to(overlayEl, {
+      opacity: 0,
+      duration: 0.25,
+      ease: 'power2.in',
+      onComplete() {
+        overlayEl.classList.add('hidden');
+        overlayEl.style.pointerEvents = 'none';
+        overlayMediaEl.innerHTML = '';
+      },
+    });
+  }
+
+  function overlayNext(): void {
+    if (!overlayOpen) return;
+    if (overlayIndex < overlayItems.length - 1) {
+      overlayIndex++;
+      renderOverlayMedia();
+    }
+  }
+
+  function overlayPrev(): void {
+    if (!overlayOpen) return;
+    if (overlayIndex > 0) {
+      overlayIndex--;
+      renderOverlayMedia();
+    }
+  }
+
+  overlayPrevZone.addEventListener('click', (e) => { e.preventDefault(); overlayPrev(); });
+  overlayNextZone.addEventListener('click', (e) => { e.preventDefault(); overlayNext(); });
+  overlayCloseBtn.addEventListener('click', (e) => { e.preventDefault(); closeMobileOverlay(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (!overlayOpen) return;
+    if      (e.key === 'Escape')     { e.preventDefault(); closeMobileOverlay(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); overlayNext();        }
+    else if (e.key === 'ArrowLeft')  { e.preventDefault(); overlayPrev();        }
+  });
+
+  } // End of `if (!slider || !track)` else block
+
+  } // End of `if (!matchMedia('(min-width: 768px)').matches)` mobile gate
 </script>

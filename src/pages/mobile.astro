@@ -1,0 +1,586 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { MuxPlayer } from '@mux/mux-player-astro';
+import { loadQuery } from '../sanity/lib/loadQuery.ts';
+import { urlForImage } from '../sanity/lib/url-for-image.ts';
+
+const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
+  _id,
+  name,
+  type,
+  index,
+  thumbnail {
+    ...,
+    asset-> {
+      _id,
+      url,
+      metadata {
+        dimensions,
+        lqip
+      }
+    }
+  },
+  imageGallery[] {
+    _key,
+    asset-> {
+      _id,
+      url,
+      metadata {
+        dimensions,
+        lqip
+      }
+    }
+  },
+  muxID,
+}`;
+
+const { data: projects } = await loadQuery({ query: PROJECTS_QUERY });
+
+const projectsWithUrls = projects.map((project: any) => ({
+  ...project,
+  thumbnailUrl: project.thumbnail?.asset
+    ? `${urlForImage(project.thumbnail).url()}?auto=format`
+    : null,
+  galleryUrls:
+    project.imageGallery
+      ?.filter((img: any) => img?.asset)
+      .map((img: any) => ({
+        url: `${urlForImage(img).url()}?auto=format`,
+        _key: img._key,
+      })) ?? [],
+}));
+
+// Build extended list for infinite looping:
+// [clone-of-last, ...real-items, clone-of-first]
+const extendedProjects =
+  projectsWithUrls.length > 0
+    ? [
+        projectsWithUrls[projectsWithUrls.length - 1],
+        ...projectsWithUrls,
+        projectsWithUrls[0],
+      ]
+    : [];
+---
+
+<Layout title="Justin Abernethy">
+  <main class="fixed inset-0 z-50 bg-theme text-theme overflow-hidden p-padding">
+    <div
+      id="mobile-slider"
+      class="h-full w-full relative overflow-hidden touch-none select-none"
+    >
+
+      <!-- Track: absolutely positioned so GSAP can translateY it freely -->
+      <div
+            id="slider-track"
+            class="absolute left-0 right-0 flex flex-col"
+          >
+        {extendedProjects.map((project: any, i: number) => {
+          const isCloneFirst = i === 0;
+          const isCloneLast  = i === extendedProjects.length - 1;
+          const realIndex = isCloneFirst
+            ? projectsWithUrls.length - 1
+            : isCloneLast
+              ? 0
+              : i - 1;
+
+          return (
+          <div
+                      class="slider-slide w-full shrink-0 flex items-center"
+                      data-real-index={realIndex}
+                      data-virtual-index={i}
+                    >
+              {project.thumbnailUrl ? (
+                <img
+                  src={project.thumbnailUrl}
+                  alt={project.name ?? ''}
+                  class="w-full object-cover block"
+                  style="aspect-ratio: 5/7;"
+                  loading={i <= 2 ? 'eager' : 'lazy'}
+                  draggable="false"
+                />
+              ) : project.muxID ? (
+              <div class="aspect-5/7 flex flex-col justify-center">
+                  <MuxPlayer
+                    playbackId={project.muxID}
+                    streamType="on-demand"
+                    loop={true}
+                    muted={true}
+                    autoplay
+                    style="aspect-ratio: 16/9; width: 100%; display: block; object-fit: cover;"
+                  />
+              </div>
+
+              ) : (
+                <div
+                  class="w-full bg-gray-800 block"
+                  style="aspect-ratio: 5/7;"
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <!-- Center info overlay: top edge aligns with bottom edge of centred slide -->
+      <div
+        id="center-info"
+        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-center text-white mix-blend-difference uppercase tracking-custom text-sm font-medium pointer-events-none z-10 "
+      >
+           <span id="center-name"  class="leading-[110%]"></span>
+        <span id="center-index" class="leading-[110%]"></span>
+
+
+      </div>
+
+    </div>
+
+    <!-- Mobile single-view overlay: tap left/right to navigate, tap close to exit -->
+    <div
+      id="mobile-overlay"
+      class="fixed inset-0 z-[10000] bg-black text-white hidden opacity-0 pointer-events-none"
+    >
+      <!-- Media -->
+      <div class="absolute inset-0 p-padding flex items-center justify-center">
+        <div
+          id="mobile-overlay-media"
+          class="w-full h-full flex items-center justify-center opacity-0"
+        ></div>
+      </div>
+
+      <!-- Tap zones -->
+      <button
+        id="mobile-overlay-prev-zone"
+        class="absolute top-0 bottom-0 left-0 w-1/2 z-20 bg-transparent appearance-none border-0 outline-none"
+        aria-label="Previous image"
+      ></button>
+      <button
+        id="mobile-overlay-next-zone"
+        class="absolute top-0 bottom-0 right-0 w-1/2 z-20 bg-transparent appearance-none border-0 outline-none"
+        aria-label="Next image"
+      ></button>
+
+      <!-- Close (top-right) -->
+      <button
+        id="mobile-overlay-close"
+        class="absolute top-8 left-padding z-30 uppercase tracking-custom text-sm font-medium opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none"
+      >Exit</button>
+
+      <!-- Bottom-left: title + index stacked -->
+      <div
+        class="absolute bottom-padding left-padding z-30 flex flex-col items-start uppercase tracking-custom text-sm font-medium pointer-events-none leading-[110%]"
+      >
+          <span id="mobile-overlay-index" class="opacity-50"></span>
+        <span id="mobile-overlay-name"></span>
+
+      </div>
+
+      <!-- Bottom-right: counter -->
+      <div
+        class="absolute bottom-padding right-padding z-30 uppercase tracking-custom text-sm font-medium pointer-events-none leading-[110%]"
+      >
+        <span id="mobile-overlay-counter"></span>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<!-- Expose serialised project data to the module script below -->
+<script define:vars={{ projectsData: projectsWithUrls }}>
+  window.__MOBILE_PROJECTS__ = projectsData;
+</script>
+
+<script>
+  import gsap from 'gsap';
+
+  // ── Constants ─────────────────────────────────────────────────────────────────
+     // matches Tailwind gap-16 (4 rem @ 16 px/rem)
+  const SNAP_THRESHOLD = 80;      // px — below this, snap back to current slide
+  const SLIDE_DURATION = 0.7;
+  const SLIDE_EASE     = 'expo.out';
+
+  // ── DOM refs ──────────────────────────────────────────────────────────────────
+  const slider        = document.getElementById('mobile-slider')  as HTMLElement;
+  const track         = document.getElementById('slider-track')   as HTMLElement;
+  const centerInfo    = document.getElementById('center-info')    as HTMLElement;
+  const centerNameEl  = document.getElementById('center-name')    as HTMLElement;
+  const centerIndexEl = document.getElementById('center-index')   as HTMLElement;
+  const slides        = Array.from(
+    track.querySelectorAll<HTMLElement>('.slider-slide'),
+  );
+
+  // ── Project data (injected by the define:vars script above) ──────────────────
+  const projects: any[] = (window as any).__MOBILE_PROJECTS__ ?? [];
+  const n = projects.length;
+
+  if (n === 0 && centerInfo) {
+    centerInfo.style.display = 'none';
+  }
+
+  // ── State ─────────────────────────────────────────────────────────────────────
+  let currentVirtualIndex = 1;  // 1 = first real item in the extended array
+  let currentTranslateY   = 0;
+  let animating           = false;
+  let isDragging          = false;
+  let startY              = 0;
+  let startX              = 0;
+  let startTime           = 0;
+  let startTranslateY     = 0;
+
+  // ── Tap detection thresholds ─────────────────────────────────────────────────
+  const TAP_MAX_MOVE = 10;   // px — total movement below this counts as a tap
+  const TAP_MAX_TIME = 300;  // ms — gesture shorter than this counts as a tap
+
+  function maybeTap(deltaY: number, deltaX: number, elapsed: number): boolean {
+    return (
+      Math.abs(deltaY) < TAP_MAX_MOVE &&
+      Math.abs(deltaX) < TAP_MAX_MOVE &&
+      elapsed < TAP_MAX_TIME
+    );
+  }
+
+  function currentRealIndex(): number {
+    const vi = currentVirtualIndex;
+    return vi === 0 ? n - 1 : vi === n + 1 ? 0 : vi - 1;
+  }
+
+
+
+  // ── Position math ─────────────────────────────────────────────────────────────
+  function sizeSlides(): void {
+    const h = slider.offsetHeight;
+    for (const slide of slides) slide.style.height = `${h}px`;
+  }
+
+  function translateYForVirtual(vi: number): number {
+      return -(vi * slider.offsetHeight);
+    }
+
+
+
+  function updateInfoText(vi: number): void {
+    if (n === 0) return;
+    // vi=0 → clone of last, vi=n+1 → clone of first, else real item vi-1
+    const realIdx = vi === 0 ? n - 1 : vi === n + 1 ? 0 : vi - 1;
+    const project = projects[realIdx];
+    if (!project) return;
+    centerNameEl.textContent  = project.name ?? '';
+    centerIndexEl.textContent = String(
+      typeof project.index === 'number' ? project.index : realIdx + 1,
+    ).padStart(3, '0');
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────────
+  function goToVirtual(vi: number, animate = true): void {
+    if (n === 0) return;
+    const targetY = translateYForVirtual(vi);
+    updateInfoText(vi);
+
+    if (animate) {
+      animating = true;
+      currentVirtualIndex = vi;
+      gsap.to(track, {
+        y: targetY,
+        duration: SLIDE_DURATION,
+        ease: SLIDE_EASE,
+        onComplete() {
+          animating           = false;
+          currentTranslateY   = targetY;
+          // Silently snap from clone back to the matching real item
+          if (vi === 0)     goToVirtual(n, false);
+          if (vi === n + 1) goToVirtual(1, false);
+        },
+      });
+    } else {
+      gsap.set(track, { y: targetY });
+      currentTranslateY   = targetY;
+      currentVirtualIndex = vi;
+    }
+  }
+
+  // ── Touch events ──────────────────────────────────────────────────────────────
+  function onTouchStart(e: TouchEvent): void {
+    if (n === 0) return;
+    startY          = e.touches[0].clientY;
+    startX          = e.touches[0].clientX;
+    startTime       = performance.now();
+    startTranslateY = gsap.getProperty(track, 'y') as number;
+    isDragging      = true;
+    gsap.killTweensOf(track);
+    animating = false;
+  }
+
+  function onTouchMove(e: TouchEvent): void {
+    if (!isDragging || n === 0) return;
+    e.preventDefault(); // blocks native overscroll
+    gsap.set(track, { y: startTranslateY + (e.touches[0].clientY - startY) });
+  }
+
+  function onTouchEnd(e: TouchEvent): void {
+    if (!isDragging || n === 0) return;
+    isDragging = false;
+    const t   = e.changedTouches[0];
+    const dy  = t.clientY - startY;
+    const dx  = t.clientX - startX;
+    const dt  = performance.now() - startTime;
+
+    if (maybeTap(dy, dx, dt)) {
+      goToVirtual(currentVirtualIndex);
+      openMobileOverlay(currentRealIndex());
+      return;
+    }
+
+    if      (dy < -SNAP_THRESHOLD) goToVirtual(currentVirtualIndex + 1);
+    else if (dy >  SNAP_THRESHOLD) goToVirtual(currentVirtualIndex - 1);
+    else                           goToVirtual(currentVirtualIndex);
+  }
+
+  slider.addEventListener('touchstart', onTouchStart, { passive: true });
+  slider.addEventListener('touchmove',  onTouchMove,  { passive: false });
+  slider.addEventListener('touchend',   onTouchEnd,   { passive: true });
+
+  // ── Pointer events (mouse / desktop testing) ──────────────────────────────────
+  // pointerType guard prevents double-firing on touch devices.
+  function onPointerDown(e: PointerEvent): void {
+    if (e.pointerType !== 'mouse' || n === 0) return;
+    startY          = e.clientY;
+    startX          = e.clientX;
+    startTime       = performance.now();
+    startTranslateY = gsap.getProperty(track, 'y') as number;
+    isDragging      = true;
+    slider.setPointerCapture(e.pointerId);
+    gsap.killTweensOf(track);
+    animating = false;
+  }
+
+  function onPointerMove(e: PointerEvent): void {
+    if (!isDragging || e.pointerType !== 'mouse' || n === 0) return;
+    gsap.set(track, { y: startTranslateY + (e.clientY - startY) });
+  }
+
+  function onPointerUp(e: PointerEvent): void {
+    if (!isDragging || e.pointerType !== 'mouse' || n === 0) return;
+    isDragging = false;
+    const dy = e.clientY - startY;
+    const dx = e.clientX - startX;
+    const dt = performance.now() - startTime;
+
+    if (maybeTap(dy, dx, dt)) {
+      goToVirtual(currentVirtualIndex);
+      openMobileOverlay(currentRealIndex());
+      return;
+    }
+
+    if      (dy < -SNAP_THRESHOLD) goToVirtual(currentVirtualIndex + 1);
+    else if (dy >  SNAP_THRESHOLD) goToVirtual(currentVirtualIndex - 1);
+    else                           goToVirtual(currentVirtualIndex);
+  }
+
+  function onPointerCancel(e: PointerEvent): void {
+    if (!isDragging || e.pointerType !== 'mouse') return;
+    isDragging = false;
+    goToVirtual(currentVirtualIndex);
+  }
+
+  slider.addEventListener('pointerdown',   onPointerDown);
+  slider.addEventListener('pointermove',   onPointerMove);
+  slider.addEventListener('pointerup',     onPointerUp);
+  slider.addEventListener('pointercancel', onPointerCancel);
+
+  // ── Wheel event (desktop scroll / trackpad) ───────────────────────────────────
+  // Accumulate delta so a single scroll gesture only ever triggers one slide.
+  // While a GSAP tween is running we eat incoming events to prevent queue buildup.
+  let wheelAccum = 0;
+  let wheelResetTimer: ReturnType<typeof setTimeout> | null = null;
+  const WHEEL_THRESHOLD = 50; // px of accumulated deltaY to trigger a slide
+
+  function onWheel(e: WheelEvent): void {
+    e.preventDefault();
+    if (n === 0) return;
+
+    // Drain any leftover accumulation while the slide is animating
+    if (animating) {
+      wheelAccum = 0;
+      if (wheelResetTimer !== null) { clearTimeout(wheelResetTimer); wheelResetTimer = null; }
+      return;
+    }
+
+    wheelAccum += e.deltaY;
+
+    // Reset the accumulator if the user pauses mid-gesture
+    if (wheelResetTimer !== null) clearTimeout(wheelResetTimer);
+    wheelResetTimer = setTimeout(() => { wheelAccum = 0; }, 200);
+
+    if (Math.abs(wheelAccum) >= WHEEL_THRESHOLD) {
+      const dir = wheelAccum > 0 ? 1 : -1;
+      wheelAccum = 0;
+      if (wheelResetTimer !== null) { clearTimeout(wheelResetTimer); wheelResetTimer = null; }
+      goToVirtual(currentVirtualIndex + dir);
+    }
+  }
+
+  slider.addEventListener('wheel', onWheel, { passive: false });
+
+
+  // ── Resize handler (debounced) ────────────────────────────────────────────────
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  window.addEventListener('resize', () => {
+    if (resizeTimer !== null) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      sizeSlides();
+      goToVirtual(currentVirtualIndex, false);
+
+    }, 100);
+  });
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
+  function init(): void {
+    if (n === 0) return;
+    // Defer one frame so offsetHeight is available after first layout pass.
+    requestAnimationFrame(() => {
+      sizeSlides();
+      goToVirtual(1, false);
+
+      updateInfoText(1);
+    });
+  }
+
+  init();
+
+  // ─── Mobile single-view overlay ──────────────────────────────────────────────
+  type OverlayMedia =
+    | { type: 'video'; playbackId: string; alt: string }
+    | { type: 'image'; url: string;        alt: string };
+
+  const overlayEl       = document.getElementById('mobile-overlay')          as HTMLElement;
+  const overlayMediaEl  = document.getElementById('mobile-overlay-media')    as HTMLElement;
+  const overlayNameEl   = document.getElementById('mobile-overlay-name')     as HTMLElement;
+  const overlayIndexEl  = document.getElementById('mobile-overlay-index')    as HTMLElement;
+  const overlayCountEl  = document.getElementById('mobile-overlay-counter')  as HTMLElement;
+  const overlayPrevZone = document.getElementById('mobile-overlay-prev-zone') as HTMLElement;
+  const overlayNextZone = document.getElementById('mobile-overlay-next-zone') as HTMLElement;
+  const overlayCloseBtn = document.getElementById('mobile-overlay-close')     as HTMLElement;
+
+  let overlayOpen        = false;
+  let overlayItems: OverlayMedia[] = [];
+  let overlayIndex       = 0;
+  let overlayProjectName = '';
+  let overlayProjectIdx  = '';
+
+  function buildOverlayItems(project: any): OverlayMedia[] {
+    const items: OverlayMedia[] = [];
+    if (project.muxID && !project.thumbnailUrl) {
+      items.push({ type: 'video', playbackId: project.muxID, alt: project.name ?? '' });
+    } else if (project.thumbnailUrl) {
+      items.push({ type: 'image', url: project.thumbnailUrl, alt: project.name ?? '' });
+    }
+    if (Array.isArray(project.galleryUrls)) {
+      for (const img of project.galleryUrls) {
+        items.push({ type: 'image', url: img.url, alt: project.name ?? '' });
+      }
+    }
+    return items;
+  }
+
+  function renderOverlayMedia(): void {
+    overlayMediaEl.innerHTML = '';
+    const item = overlayItems[overlayIndex];
+    if (!item) return;
+
+    if (item.type === 'video') {
+      const player = document.createElement('mux-player');
+      player.setAttribute('playback-id', item.playbackId);
+      player.setAttribute('autoplay', '');
+      player.setAttribute('loop', '');
+      player.setAttribute('muted', '');
+      player.setAttribute('playsinline', '');
+      player.style.setProperty('--controls', 'none');
+      player.style.width = '100%';
+      player.style.maxHeight = '100%';
+      overlayMediaEl.appendChild(player);
+    } else {
+      const img = document.createElement('img');
+      img.src = item.url;
+      img.alt = item.alt;
+      img.draggable = false;
+      img.className = 'max-w-full max-h-full object-contain block';
+      overlayMediaEl.appendChild(img);
+    }
+
+    overlayCountEl.textContent =
+      `${overlayIndex + 1}/${overlayItems.length}`;
+  }
+
+  function openMobileOverlay(realIdx: number): void {
+    if (n === 0) return;
+    const project = projects[realIdx];
+    if (!project) return;
+
+    overlayItems = buildOverlayItems(project);
+    if (overlayItems.length === 0) return;
+
+    overlayIndex       = 0;
+    overlayProjectName = project.name ?? '';
+    overlayProjectIdx  = String(
+      typeof project.index === 'number' ? project.index : realIdx + 1,
+    ).padStart(3, '0');
+
+    overlayNameEl.textContent  = overlayProjectName;
+    overlayIndexEl.textContent = overlayProjectIdx;
+
+    overlayEl.classList.remove('hidden');
+    void overlayEl.offsetHeight;
+
+    renderOverlayMedia();
+
+    overlayOpen = true;
+    overlayEl.style.pointerEvents = 'auto';
+
+    gsap.to(overlayEl,      { opacity: 1, duration: 0.25, ease: 'power2.out' });
+    gsap.fromTo(overlayMediaEl,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.4, delay: 0.1, ease: 'power2.out' });
+  }
+
+  function closeMobileOverlay(): void {
+    if (!overlayOpen) return;
+    overlayOpen = false;
+
+    gsap.to(overlayEl, {
+      opacity: 0,
+      duration: 0.25,
+      ease: 'power2.in',
+      onComplete() {
+        overlayEl.classList.add('hidden');
+        overlayEl.style.pointerEvents = 'none';
+        overlayMediaEl.innerHTML = '';
+      },
+    });
+  }
+
+  function overlayNext(): void {
+    if (!overlayOpen) return;
+    if (overlayIndex < overlayItems.length - 1) {
+      overlayIndex++;
+      renderOverlayMedia();
+    }
+  }
+
+  function overlayPrev(): void {
+    if (!overlayOpen) return;
+    if (overlayIndex > 0) {
+      overlayIndex--;
+      renderOverlayMedia();
+    }
+  }
+
+  overlayPrevZone.addEventListener('click', (e) => { e.preventDefault(); overlayPrev(); });
+  overlayNextZone.addEventListener('click', (e) => { e.preventDefault(); overlayNext(); });
+  overlayCloseBtn.addEventListener('click', (e) => { e.preventDefault(); closeMobileOverlay(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (!overlayOpen) return;
+    if      (e.key === 'Escape')     { e.preventDefault(); closeMobileOverlay(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); overlayNext();        }
+    else if (e.key === 'ArrowLeft')  { e.preventDefault(); overlayPrev();        }
+  });
+</script>
