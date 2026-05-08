@@ -165,7 +165,7 @@ const extendedProjects =
         <div class="w-full flex pb-padding">
           <div class="grid grid-cols-10 gap-padding w-full">
             <!-- Left Sidebar -->
-            <div class="col-span-2 flex flex-col h-full min-h-screen">
+            <div class="col-span-2 max-[1100px]:col-span-3 flex flex-col h-full min-h-screen">
               <div class="sticky top-0 h-screen min-h-200 w-full flex flex-col justify-end pb-padding">
                 <!-- Project name -->
                 <div class="flex flex-col grow justify-end pb-padding text-sm uppercase tracking-custom leading-[105%] font-normal">
@@ -222,8 +222,8 @@ const extendedProjects =
             </div>
 
             <!-- Right Content - Image Gallery -->
-            <div class="col-span-8 flex flex-col gap-padding">
-              <div id="detail-image-gallery" class="grid grid-cols-2 grid-flow-row gap-padding w-full">
+            <div class="col-span-8 max-[1100px]:col-span-7 flex flex-col gap-padding">
+              <div id="detail-image-gallery" class="grid grid-cols-2 max-[1100px]:grid-cols-1 grid-flow-row gap-padding w-full">
                 <!-- Images will be populated dynamically -->
               </div>
             </div>
@@ -253,26 +253,48 @@ const extendedProjects =
             <p id="overlay-pagination" class="opacity-100 overlay-nav">1/5</p>
           </div>
         </div>
+
+        <!-- Mux custom controls (moved into the video wrapper at render time) -->
+        <div
+          id="overlay-mux-controls"
+          class="absolute bottom-0 left-0 right-0 z-50 px-padding py-padding flex flex-row justify-between items-center gap-4 text-white mix-blend-difference text-sm uppercase tracking-custom font-medium opacity-0 pointer-events-none transition-opacity duration-200"
+        >
+          <div class="flex flex-row gap-4 pointer-events-auto items-center">
+            <span data-mux-ctl="playpause" class="cursor-pointer hover:opacity-70">PLAY</span>
+
+            <span data-mux-ctl="mute" class="cursor-pointer hover:opacity-70">UNMUTE</span>
+
+          </div>
+
+          <div data-mux-ctl="timeline" class="flex-1 relative h-3 cursor-pointer pointer-events-auto select-none touch-none">
+            <div class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-white"></div>
+            <div data-mux-ctl="thumb" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full bg-white" style="left: 0%"></div>
+          </div>
+          <span class="inline-flex gap-1 tabular-nums">
+            <span data-mux-ctl="current">00:00</span><span>/</span><span data-mux-ctl="duration">00:00</span>
+          </span>
+           <span data-mux-ctl="fullscreen" class="cursor-pointer hover:opacity-70 hidden md:inline">FULLSCREEN</span>
+        </div>
       </div>
     </section>
     <div class="h-100"></div>
     <div id="desktop-footer" class="h-screen min-h-220 grid! grid-cols-10! gap-gutter text-sm leading-[110%]" style="visibility: hidden; opacity: 0;">
-        <div class="min-[1100px]:col-span-5 col-span-4 h-full flex flex-col justify-center">
-            <div class="flex flex-col gap-padding w-full h-fit min-[1100px]:grid min-[1100px]:grid-cols-5 min-[1100px]:gap-gutter">
-                <div class="min-[1100px]:col-span-3! flex flex-row items-start justify-start">
+        <div class="min-[1350px]:col-span-5 col-span-4 h-full flex flex-col justify-center">
+            <div class="flex flex-col gap-padding w-full h-fit min-[1350px]:grid min-[1350px]:grid-cols-5 min-[1350px]:gap-gutter">
+                <div class="min-[1350px]:col-span-3! flex flex-row items-start justify-start">
                     <p class="text-nowrap">
                         Director and Photographer Based in Toronto.<br/><span id="email"class="opacity-muted text-nowrap cursor-pointer">info@justinabernethy.com</span>
                     </p>
                 </div>
-                <div class="min-[1100px]:pt-0 pt-10 flex flex-row gap-10 min-[1100px]:gap-padding min-[1100px]:contents ">
-                    <div id="footer-button" class="min-[1100px]:col-span-1 min-[1100px]:justify-end flex flex-row justify-start items-start hover:opacity-muted cursor-pointer">Instagram</div>
-                    <div id="footer-button" class="min-[1100px]:col-span-1 min-[1100px]:justify-end min-[1100px]:pr-4  flex flex-row justify-start  items-start hover:opacity-muted cursor-pointer">Vimeo</div>
+                <div class="min-[1350px]:pt-0 pt-10 flex flex-row gap-10 min-[1350px]:gap-padding min-[1350px]:contents ">
+                    <div id="footer-button" class="min-[1350px]:col-span-1 min-[1350px]:justify-end flex flex-row justify-start items-start hover:opacity-muted cursor-pointer">Instagram</div>
+                    <div id="footer-button" class="min-[1350px]:col-span-1 min-[1350px]:justify-end min-[1350px]:pr-4  flex flex-row justify-start  items-start hover:opacity-muted cursor-pointer">Vimeo</div>
                 </div>
             </div>
         </div>
-        <div class="min-[1100px]:col-span-5 col-span-6 flex flex-row justify-end items-end h-full">
-            <div class="w-full h-screen px-padding py-3">
-                <Picture src={headshot} alt="Justin Abernethy headshot" class="aspect-5/7 w-full h-full object-cover min-w-165"></Picture>
+        <div class="min-[1350px]:col-span-5 col-span-6 flex flex-row justify-end items-end h-full">
+            <div class="w-full h-screen px-padding py-3 flex flex-col justify-end items-end overflow-clip">
+                <Picture src={headshot} alt="Justin Abernethy headshot" class="aspect-5/7 w-full h-auto object-cover min-h-157 max-h-[90vh]"></Picture>
             </div>
         </div>
     </div>
@@ -377,6 +399,7 @@ const extendedProjects =
       >Exit</button>
 
       <div
+        id="mobile-overlay-meta-left"
         class="absolute bottom-padding left-padding z-30 flex flex-col items-start uppercase tracking-custom text-sm font-normal pointer-events-none leading-[110%]"
       >
         <span id="mobile-overlay-index" class="opacity-50"></span>
@@ -384,9 +407,33 @@ const extendedProjects =
       </div>
 
       <div
+        id="mobile-overlay-meta-right"
         class="absolute bottom-padding right-padding z-30 uppercase tracking-custom text-sm font-normal pointer-events-none leading-[110%]"
       >
         <span id="mobile-overlay-counter"></span>
+      </div>
+
+      <!-- Mux custom controls (visible only on mobile-overlay videos) -->
+      <div
+        id="mobile-overlay-mux-controls"
+        class="absolute bottom-0 left-0 right-0 z-40 px-padding py-padding flex flex-row justify-between items-center gap-4 text-white mix-blend-difference text-sm uppercase tracking-custom font-normal opacity-0 pointer-events-none transition-opacity duration-200"
+        style="visibility: hidden;"
+      >
+        <div class="flex flex-row gap-4 pointer-events-auto items-center">
+          <span data-mux-ctl="playpause" class="cursor-pointer">PLAY</span>
+          <span data-mux-ctl="mute" class="cursor-pointer">UNMUTE</span>
+        </div>
+
+        <div data-mux-ctl="timeline" class="flex-1 relative h-3 cursor-pointer pointer-events-auto select-none touch-none">
+          <div class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-white"></div>
+          <div data-mux-ctl="thumb" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full bg-white" style="left: 0%"></div>
+        </div>
+
+        <span class="inline-flex gap-1 tabular-nums">
+          <span data-mux-ctl="current">00:00</span><span>/</span><span data-mux-ctl="duration">00:00</span>
+        </span>
+
+        <span data-mux-ctl="fullscreen" class="cursor-pointer pointer-events-auto">FULLSCREEN</span>
       </div>
     </div>
   </div>
@@ -425,8 +472,8 @@ const extendedProjects =
   const FLIP_DURATION = 0.6;
   const SETTLE_DURATION = 0.6;
 
-  const MOVE_DURATION = 1;
-  const MOVE_DELAY = 0.1;
+  const MOVE_DURATION = 0.8;
+  const MOVE_DELAY = 0.3;
 
   const VERTICAL_THRESHOLD = 0.9;
   const INTENSITY_MULTIPLIER = 0.8;
@@ -1457,25 +1504,177 @@ const extendedProjects =
     return items;
   }
 
+  // ─── Custom mux-player controls (single-view overlay) ───────────────────
+  type MuxPlayer = HTMLElement & {
+    play?: () => Promise<void>;
+    pause?: () => void;
+    muted: boolean;
+    paused: boolean;
+    currentTime: number;
+    duration: number;
+    requestFullscreen?: () => Promise<void>;
+  };
+
+  const muxControls       = document.getElementById('overlay-mux-controls');
+  const muxControlsHome   = muxControls?.parentElement ?? null; // remember static parent
+  const muxPlayPauseEl    = muxControls?.querySelector('[data-mux-ctl="playpause"]')  as HTMLElement | null;
+  const muxFullscreenEl   = muxControls?.querySelector('[data-mux-ctl="fullscreen"]') as HTMLElement | null;
+  const muxMuteEl         = muxControls?.querySelector('[data-mux-ctl="mute"]')       as HTMLElement | null;
+  const muxCurrentEl      = muxControls?.querySelector('[data-mux-ctl="current"]')    as HTMLElement | null;
+  const muxDurationEl     = muxControls?.querySelector('[data-mux-ctl="duration"]')   as HTMLElement | null;
+  const muxTimelineEl     = muxControls?.querySelector('[data-mux-ctl="timeline"]')   as HTMLElement | null;
+  const muxThumbEl        = muxControls?.querySelector('[data-mux-ctl="thumb"]')      as HTMLElement | null;
+
+  let activeMuxPlayer: MuxPlayer | null = null;
+  const muxListeners: { [k: string]: (e?: any) => void } = {};
+
+  function fmtTime(s: number): string {
+    if (!isFinite(s) || s < 0) return '00:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+
+  function syncMuxUI() {
+    if (!activeMuxPlayer) return;
+    if (muxPlayPauseEl) muxPlayPauseEl.textContent = activeMuxPlayer.paused ? 'PLAY' : 'PAUSE';
+    if (muxMuteEl)      muxMuteEl.textContent      = activeMuxPlayer.muted  ? 'UNMUTE' : 'MUTE';
+    const cur = activeMuxPlayer.currentTime || 0;
+    const dur = activeMuxPlayer.duration    || 0;
+    if (muxCurrentEl)  muxCurrentEl.textContent  = fmtTime(cur);
+    if (muxDurationEl) muxDurationEl.textContent = fmtTime(dur);
+    const pct = dur > 0 ? Math.max(0, Math.min(100, (cur / dur) * 100)) : 0;
+    if (muxThumbEl) muxThumbEl.style.left = `${pct}%`;
+  }
+
+  // Pin the controls bar to the active player's bottom edge using fixed
+  // positioning. Re-runs on resize and after metadata loads (in case the
+  // player resizes when its aspect ratio is known).
+  function positionMuxControls() {
+    if (!muxControls || !activeMuxPlayer) return;
+    const rect = activeMuxPlayer.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      requestAnimationFrame(positionMuxControls);
+      return;
+    }
+    muxControls.style.position = 'fixed';
+    muxControls.style.top      = '';
+    muxControls.style.right    = '';
+    muxControls.style.left     = `${rect.left}px`;
+    muxControls.style.width    = `${rect.width}px`;
+    muxControls.style.bottom   = `${window.innerHeight - rect.bottom}px`;
+  }
+
+  const onMuxControlsResize = () => positionMuxControls();
+
+  function attachMuxControls(player: MuxPlayer) {
+    detachMuxControls();
+    activeMuxPlayer = player;
+
+    muxListeners.play     = () => syncMuxUI();
+    muxListeners.pause    = () => syncMuxUI();
+    muxListeners.timeupdate     = () => syncMuxUI();
+    muxListeners.loadedmetadata = () => { syncMuxUI(); positionMuxControls(); };
+    muxListeners.durationchange = () => syncMuxUI();
+    muxListeners.volumechange   = () => syncMuxUI();
+    for (const ev of Object.keys(muxListeners)) {
+      player.addEventListener(ev, muxListeners[ev]);
+    }
+    syncMuxUI();
+    positionMuxControls();
+    window.addEventListener('resize', onMuxControlsResize);
+
+    if (muxControls) {
+      muxControls.style.opacity    = '1';
+      muxControls.style.visibility = 'visible';
+    }
+  }
+
+  function detachMuxControls() {
+    if (activeMuxPlayer) {
+      for (const ev of Object.keys(muxListeners)) {
+        activeMuxPlayer.removeEventListener(ev, muxListeners[ev]);
+      }
+    }
+    activeMuxPlayer = null;
+    window.removeEventListener('resize', onMuxControlsResize);
+    if (muxControls) {
+      muxControls.style.opacity    = '0';
+      muxControls.style.visibility = 'hidden';
+      // Clear fixed-position inline styles so a fresh attach starts clean.
+      muxControls.style.position = '';
+      muxControls.style.top      = '';
+      muxControls.style.left     = '';
+      muxControls.style.right    = '';
+      muxControls.style.bottom   = '';
+      muxControls.style.width    = '';
+    }
+  }
+
+  // Static control handlers — read activeMuxPlayer at click time.
+  muxPlayPauseEl?.addEventListener('click', () => {
+    if (!activeMuxPlayer) return;
+    if (activeMuxPlayer.paused) activeMuxPlayer.play?.().catch(() => {});
+    else activeMuxPlayer.pause?.();
+  });
+  muxFullscreenEl?.addEventListener('click', () => {
+    if (!activeMuxPlayer) return;
+    if (document.fullscreenElement) document.exitFullscreen();
+    else activeMuxPlayer.requestFullscreen?.().catch(() => {});
+  });
+  muxMuteEl?.addEventListener('click', () => {
+    if (!activeMuxPlayer) return;
+    activeMuxPlayer.muted = !activeMuxPlayer.muted;
+    syncMuxUI();
+  });
+
+  // Timeline scrub
+  let muxScrubbing = false;
+  function seekFromClientX(clientX: number) {
+    if (!activeMuxPlayer || !muxTimelineEl) return;
+    const rect = muxTimelineEl.getBoundingClientRect();
+    const pct  = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const dur  = activeMuxPlayer.duration || 0;
+    if (dur > 0) {
+      activeMuxPlayer.currentTime = pct * dur;
+      if (muxThumbEl) muxThumbEl.style.left = `${pct * 100}%`;
+    }
+  }
+  muxTimelineEl?.addEventListener('pointerdown', (e) => {
+    muxScrubbing = true;
+    seekFromClientX(e.clientX);
+    muxTimelineEl.setPointerCapture(e.pointerId);
+  });
+  muxTimelineEl?.addEventListener('pointermove', (e) => {
+    if (muxScrubbing) seekFromClientX(e.clientX);
+  });
+  muxTimelineEl?.addEventListener('pointerup',     () => { muxScrubbing = false; });
+  muxTimelineEl?.addEventListener('pointercancel', () => { muxScrubbing = false; });
+
   function renderOverlayMedia() {
     if (!overlayMediaContainer) return;
 
     const item = overlayState.mediaItems[overlayState.currentIndex];
     if (!item) return;
 
+    // Move controls back to their static home BEFORE wiping the container so
+    // `innerHTML = ''` doesn't destroy the bar.
+    detachMuxControls();
     overlayMediaContainer.innerHTML = '';
 
     if (item.type === 'video') {
-      const player = document.createElement('mux-player') as HTMLElement & { play?: () => Promise<void> };
+      const player = document.createElement('mux-player') as MuxPlayer;
       player.setAttribute('playback-id', item.playbackId);
-      player.className = 'w-full h-auto max-h-screen object-contain';
+      player.className = 'w-full h-auto max-h-screen object-contain block';
       player.setAttribute('loop', '');
       player.setAttribute('muted', '');
       player.setAttribute('playsinline', '');
       player.style.setProperty('--controls', 'none');
       overlayMediaContainer.appendChild(player);
+
       customElements.whenDefined('mux-player').then(() => {
         player.play?.().catch(() => { /* autoplay blocked */ });
+        attachMuxControls(player);
       });
     } else {
       const img = document.createElement('img');
@@ -1571,6 +1770,7 @@ const extendedProjects =
     if (!overlayState.isOpen || !overlay) return;
 
     overlayState.isOpen = false;
+    detachMuxControls();
 
     const tl = gsap.timeline({
       defaults: { ease: 'power3.in' },
@@ -2067,9 +2267,175 @@ const extendedProjects =
   const overlayNameEl   = document.getElementById('mobile-overlay-name')      as HTMLElement;
   const overlayIndexEl  = document.getElementById('mobile-overlay-index')     as HTMLElement;
   const overlayCountEl  = document.getElementById('mobile-overlay-counter')   as HTMLElement;
+  const overlayMetaLeft  = document.getElementById('mobile-overlay-meta-left')  as HTMLElement;
+  const overlayMetaRight = document.getElementById('mobile-overlay-meta-right') as HTMLElement;
   const overlayPrevZone = document.getElementById('mobile-overlay-prev-zone') as HTMLElement;
   const overlayNextZone = document.getElementById('mobile-overlay-next-zone') as HTMLElement;
   const overlayCloseBtn = document.getElementById('mobile-overlay-close')     as HTMLElement;
+
+  // ── Mux custom controls (mobile project view) ────────────────────────────
+  type MobileMuxPlayer = HTMLElement & {
+    play?:    () => Promise<void>;
+    pause?:   () => void;
+    muted:    boolean;
+    paused:   boolean;
+    currentTime: number;
+    duration:    number;
+    requestFullscreen?: () => Promise<void>;
+  };
+
+  const muxControls    = document.getElementById('mobile-overlay-mux-controls');
+  const muxPlayPauseEl  = muxControls?.querySelector('[data-mux-ctl="playpause"]')  as HTMLElement | null;
+  const muxMuteEl       = muxControls?.querySelector('[data-mux-ctl="mute"]')       as HTMLElement | null;
+  const muxFullscreenEl = muxControls?.querySelector('[data-mux-ctl="fullscreen"]') as HTMLElement | null;
+  const muxCurrentEl    = muxControls?.querySelector('[data-mux-ctl="current"]')    as HTMLElement | null;
+  const muxDurationEl   = muxControls?.querySelector('[data-mux-ctl="duration"]')   as HTMLElement | null;
+  const muxTimelineEl   = muxControls?.querySelector('[data-mux-ctl="timeline"]')   as HTMLElement | null;
+  const muxThumbEl      = muxControls?.querySelector('[data-mux-ctl="thumb"]')      as HTMLElement | null;
+
+  let activeMuxPlayer: MobileMuxPlayer | null = null;
+  const muxListeners: { [k: string]: (e?: any) => void } = {};
+
+  function fmtTime(s: number): string {
+    if (!isFinite(s) || s < 0) return '00:00';
+    const m   = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+
+  function syncMuxUI() {
+    if (!activeMuxPlayer) return;
+    if (muxPlayPauseEl) muxPlayPauseEl.textContent = activeMuxPlayer.paused ? 'PLAY' : 'PAUSE';
+    if (muxMuteEl)      muxMuteEl.textContent      = activeMuxPlayer.muted  ? 'UNMUTE' : 'MUTE';
+    const cur = activeMuxPlayer.currentTime || 0;
+    const dur = activeMuxPlayer.duration    || 0;
+    if (muxCurrentEl)  muxCurrentEl.textContent  = fmtTime(cur);
+    if (muxDurationEl) muxDurationEl.textContent = fmtTime(dur);
+    const pct = dur > 0 ? Math.max(0, Math.min(100, (cur / dur) * 100)) : 0;
+    if (muxThumbEl) muxThumbEl.style.left = `${pct}%`;
+  }
+
+  function positionMuxControls() {
+    if (!muxControls || !activeMuxPlayer) return;
+    const rect = activeMuxPlayer.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      requestAnimationFrame(positionMuxControls);
+      return;
+    }
+    muxControls.style.position = 'fixed';
+    muxControls.style.top      = '';
+    muxControls.style.right    = '';
+    muxControls.style.left     = `${rect.left}px`;
+    muxControls.style.width    = `${rect.width}px`;
+    muxControls.style.bottom   = `${window.innerHeight - rect.bottom}px`;
+  }
+
+  const onMuxControlsResize = () => positionMuxControls();
+
+  function attachMuxControls(player: MobileMuxPlayer) {
+    detachMuxControls();
+    activeMuxPlayer = player;
+
+    muxListeners.play           = () => syncMuxUI();
+    muxListeners.pause          = () => syncMuxUI();
+    muxListeners.timeupdate     = () => syncMuxUI();
+    muxListeners.loadedmetadata = () => { syncMuxUI(); positionMuxControls(); };
+    muxListeners.durationchange = () => syncMuxUI();
+    muxListeners.volumechange   = () => syncMuxUI();
+    for (const ev of Object.keys(muxListeners)) {
+      player.addEventListener(ev, muxListeners[ev]);
+    }
+    syncMuxUI();
+    positionMuxControls();
+    window.addEventListener('resize', onMuxControlsResize);
+
+    if (muxControls) {
+      muxControls.style.opacity    = '1';
+      muxControls.style.visibility = 'visible';
+    }
+    // Hide the static project meta labels — controls take their place.
+    if (overlayMetaLeft)  overlayMetaLeft.style.visibility  = 'hidden';
+    if (overlayMetaRight) overlayMetaRight.style.visibility = 'hidden';
+  }
+
+  function detachMuxControls() {
+    if (activeMuxPlayer) {
+      for (const ev of Object.keys(muxListeners)) {
+        activeMuxPlayer.removeEventListener(ev, muxListeners[ev]);
+      }
+    }
+    activeMuxPlayer = null;
+    window.removeEventListener('resize', onMuxControlsResize);
+    if (muxControls) {
+      muxControls.style.opacity    = '0';
+      muxControls.style.visibility = 'hidden';
+      muxControls.style.position = '';
+      muxControls.style.top      = '';
+      muxControls.style.left     = '';
+      muxControls.style.right    = '';
+      muxControls.style.bottom   = '';
+      muxControls.style.width    = '';
+    }
+    if (overlayMetaLeft)  overlayMetaLeft.style.visibility  = '';
+    if (overlayMetaRight) overlayMetaRight.style.visibility = '';
+  }
+
+  // Static control handlers — read activeMuxPlayer at click time.
+  muxPlayPauseEl?.addEventListener('click', () => {
+    if (!activeMuxPlayer) return;
+    if (activeMuxPlayer.paused) activeMuxPlayer.play?.().catch(() => {});
+    else activeMuxPlayer.pause?.();
+  });
+  muxMuteEl?.addEventListener('click', () => {
+    if (!activeMuxPlayer) return;
+    activeMuxPlayer.muted = !activeMuxPlayer.muted;
+    syncMuxUI();
+  });
+  muxFullscreenEl?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!activeMuxPlayer) return;
+
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+      return;
+    }
+
+    // Fullscreen the entire mobile overlay rather than the mux-player itself.
+    // Reason: when you fullscreen the <mux-player> host element, only that
+    // host renders — our sibling controls bar vanishes — and media-chrome's
+    // internal fullscreen state machine can race against the request and
+    // dispatch an immediate `exitFullscreen()`. Fullscreening the overlay
+    // wrapper keeps the player AND controls visible and avoids the race.
+    const target: any = overlayEl;
+    const reqFs = target?.requestFullscreen?.bind(target)
+               // iOS Safari only allows fullscreen on <video>; fall back to
+               // mux-player's webkitEnterFullscreen on the underlying video.
+               ?? (activeMuxPlayer as any).webkitEnterFullscreen?.bind(activeMuxPlayer);
+    reqFs?.()?.catch?.(() => {});
+  });
+
+  let muxScrubbing = false;
+  function seekFromClientX(clientX: number) {
+    if (!activeMuxPlayer || !muxTimelineEl) return;
+    const rect = muxTimelineEl.getBoundingClientRect();
+    const pct  = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const dur  = activeMuxPlayer.duration || 0;
+    if (dur > 0) {
+      activeMuxPlayer.currentTime = pct * dur;
+      if (muxThumbEl) muxThumbEl.style.left = `${pct * 100}%`;
+    }
+  }
+  muxTimelineEl?.addEventListener('pointerdown', (e) => {
+    muxScrubbing = true;
+    seekFromClientX(e.clientX);
+    muxTimelineEl.setPointerCapture(e.pointerId);
+  });
+  muxTimelineEl?.addEventListener('pointermove', (e) => {
+    if (muxScrubbing) seekFromClientX(e.clientX);
+  });
+  muxTimelineEl?.addEventListener('pointerup',     () => { muxScrubbing = false; });
+  muxTimelineEl?.addEventListener('pointercancel', () => { muxScrubbing = false; });
 
   let overlayOpen  = false;
   let overlayItems: OverlayMedia[] = [];
@@ -2091,12 +2457,13 @@ const extendedProjects =
   }
 
   function renderOverlayMedia(): void {
+    detachMuxControls();
     overlayMediaEl.innerHTML = '';
     const item = overlayItems[overlayIndex];
     if (!item) return;
 
     if (item.type === 'video') {
-      const player = document.createElement('mux-player') as HTMLElement & { play?: () => Promise<void> };
+      const player = document.createElement('mux-player') as MobileMuxPlayer;
       player.setAttribute('playback-id', item.playbackId);
       player.setAttribute('loop', '');
       player.setAttribute('muted', '');
@@ -2107,6 +2474,7 @@ const extendedProjects =
       overlayMediaEl.appendChild(player);
       customElements.whenDefined('mux-player').then(() => {
         player.play?.().catch(() => { /* autoplay blocked */ });
+        attachMuxControls(player);
       });
     } else {
       const img = document.createElement('img');
@@ -2152,6 +2520,7 @@ const extendedProjects =
   function closeMobileOverlay(): void {
     if (!overlayOpen) return;
     overlayOpen = false;
+    detachMuxControls();
 
     gsap.to(overlayEl, {
       opacity: 0,
