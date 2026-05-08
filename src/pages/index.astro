@@ -61,17 +61,14 @@ const projectsWithUrls = projects.map(project => ({
   })) || []
 }));
 
-// Mobile shows projects in reverse order — highest index first.
-const mobileProjects = [...projectsWithUrls].reverse();
-
 // Extended list for mobile slider's infinite loop:
 // [clone-of-last, ...real-items, clone-of-first]
 const extendedProjects =
-  mobileProjects.length > 0
+  projectsWithUrls.length > 0
     ? [
-        mobileProjects[mobileProjects.length - 1],
-        ...mobileProjects,
-        mobileProjects[0],
+        projectsWithUrls[projectsWithUrls.length - 1],
+        ...projectsWithUrls,
+        projectsWithUrls[0],
       ]
     : [];
 ---
@@ -295,7 +292,7 @@ const extendedProjects =
           const isCloneFirst = i === 0;
           const isCloneLast  = i === extendedProjects.length - 1;
           const realIndex = isCloneFirst
-            ? mobileProjects.length - 1
+            ? projectsWithUrls.length - 1
             : isCloneLast
               ? 0
               : i - 1;
@@ -397,10 +394,10 @@ const extendedProjects =
 </Layout>
 
 <!-- Pass project data to client -->
-<script define:vars={{ projectsWithUrls, mobileProjects, ROW_SIZE }}>
+<script define:vars={{ projectsWithUrls, ROW_SIZE }}>
   window.__PROJECTS_DATA__   = projectsWithUrls;
   window.__ROW_SIZE__        = ROW_SIZE;
-  window.__MOBILE_PROJECTS__ = mobileProjects;
+  window.__MOBILE_PROJECTS__ = projectsWithUrls;
 </script>
 
 <script>
@@ -1881,9 +1878,7 @@ const extendedProjects =
     const project = projects[realIdx];
     if (!project) return;
     centerNameEl.textContent  = project.name ?? '';
-    centerIndexEl.textContent = String(
-      typeof project.index === 'number' ? project.index : realIdx + 1,
-    ).padStart(3, '0');
+    centerIndexEl.textContent = String(project.index ?? '').padStart(3, '0');
   }
 
   function goToVirtual(vi: number, animate = true): void {
@@ -2040,6 +2035,9 @@ const extendedProjects =
   });
 
   // ── Init ─────────────────────────────────────────────────────────────────
+  // Sanity returns projects in descending index order, so projects[0] is the
+  // highest-numbered (e.g. 025). Start at the first virtual slide; swiping up
+  // then steps 025 → 024 → … toward the lowest index.
   function init(): void {
     if (n === 0) return;
     requestAnimationFrame(() => {
@@ -2133,9 +2131,7 @@ const extendedProjects =
     overlayIndex = 0;
 
     overlayNameEl.textContent  = project.name ?? '';
-    overlayIndexEl.textContent = String(
-      typeof project.index === 'number' ? project.index : realIdx + 1,
-    ).padStart(3, '0');
+    overlayIndexEl.textContent = String(project.index ?? '').padStart(3, '0');
 
     overlayEl.classList.remove('hidden');
     void overlayEl.offsetHeight;
