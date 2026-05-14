@@ -127,7 +127,7 @@ const extendedProjects =
                       {project.muxID && !project.thumbnail?.asset ? (
                         <MuxPlayer
                           playbackId={project.muxID}
-                          class="item-media w-full object-cover aspect-16/9"
+                          class="item-media w-full object-cov   er aspect-16/9"
                           style={{ '--controls': 'none' }}
                           muted
                           loop
@@ -142,7 +142,7 @@ const extendedProjects =
                           data-flip-id={`media-${project._id}`}
                         />
                       )}
-                      <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-normal tracking-custom -mt-0.5 pb-padding">
+                      <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-normal tracking-custom -mt-0 pb-padding">
                         <div class="absolute z-0 mt-0 h-full flex flex-col gap-0 project-title">
                           <h3 class="text-sm leading-[100%] tracking-custom whitespace-nowrap">{project.name}</h3>
                         </div>
@@ -166,20 +166,15 @@ const extendedProjects =
           <div class="grid grid-cols-10 gap-padding w-full">
             <!-- Left Sidebar -->
             <div class="col-span-2 max-[1100px]:col-span-3 flex flex-col h-full min-h-screen">
-              <div class="sticky top-0 h-screen min-h-200 w-full flex flex-col justify-end pb-padding">
-                <!-- Project name -->
-                <div class="flex flex-col grow justify-end pb-padding text-sm uppercase tracking-custom leading-[105%] font-normal">
-                  <h2 id="detail-project-name"></h2>
-                  <h2 id="detail-project-type" class="opacity-muted"></h2>
-                </div>
-
-                <!-- Preview container -->
-                <div class="project-preview w-[75%] mb-padding">
+              <div class="sticky top-0 h-screen min-h-200 w-full flex flex-col pb-padding">
+                <!-- Preview container: grows into remaining space and centres itself -->
+                <div class="flex-1 flex items-center">
+                <div class="project-preview w-[75%]">
                   <div class="relative w-full" style="aspect-ratio: 4/5">
                     <div class="grid absolute inset-0" id="detail-preview-grid">
                       {projectsWithUrls.map((project) => (
                         <div
-                          class="preview-item opacity-0 col-start-1 row-start-1 flex items-end"
+                          class="preview-item opacity-0 col-start-1 row-start-1 flex items-center"
                           data-preview-id={project._id}
                         >
                           {project.muxID && !project.thumbnailUrl ? (
@@ -202,6 +197,7 @@ const extendedProjects =
                       ))}
                     </div>
                   </div>
+                </div>
                 </div>
 
                 <!-- Project list -->
@@ -227,6 +223,13 @@ const extendedProjects =
                 <!-- Images will be populated dynamically -->
               </div>
             </div>
+          </div>
+        </div>
+        <!-- Scroll back hint -->
+        <div id="scroll-back-hint" class="w-full flex flex-col justify-center items-center pt-80 text-sm uppercase tracking-custom font-normal select-none pointer-events-none" style="opacity: 0;">
+          <div class="relative">
+            <span class="opacity-[var(--opacity-muted)]">scroll to go back to projects</span>
+            <span id="scroll-back-fill" class="absolute inset-0 overflow-hidden whitespace-nowrap" style="clip-path: inset(0 100% 0 0);">scroll to go back to projects</span>
           </div>
         </div>
       </div>
@@ -375,11 +378,11 @@ const extendedProjects =
       id="mobile-overlay"
       class="fixed inset-0 z-[10000] bg-black text-white hidden opacity-0 pointer-events-none"
     >
-      <div class="absolute inset-0 p-padding flex items-center justify-center">
-        <div
-          id="mobile-overlay-media"
-          class="w-full h-full flex items-center justify-center opacity-0"
-        ></div>
+      <div
+        id="mobile-overlay-media"
+        class="absolute inset-0 overflow-hidden opacity-0"
+      >
+        <div id="mobile-overlay-track" style="display: flex; height: 100%; will-change: transform;"></div>
       </div>
 
       <button
@@ -395,12 +398,12 @@ const extendedProjects =
 
       <button
         id="mobile-overlay-close"
-        class="absolute top-8 left-padding z-30 uppercase tracking-custom text-sm font-normal opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none"
+        class="absolute top-8 left-2 z-30 uppercase tracking-custom text-sm font-normal opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none"
       >Exit</button>
 
       <div
         id="mobile-overlay-meta-left"
-        class="absolute bottom-padding left-padding z-30 flex flex-col items-start uppercase tracking-custom text-sm font-normal pointer-events-none leading-[110%]"
+        class="absolute bottom-padding left-2 z-30 flex flex-col items-start uppercase tracking-custom text-sm font-normal pointer-events-none leading-[110%]"
       >
         <span id="mobile-overlay-index" class="opacity-50"></span>
         <span id="mobile-overlay-name"></span>
@@ -408,7 +411,7 @@ const extendedProjects =
 
       <div
         id="mobile-overlay-meta-right"
-        class="absolute bottom-padding right-padding z-30 uppercase tracking-custom text-sm font-normal pointer-events-none leading-[110%]"
+        class="absolute bottom-padding right-2 z-30 uppercase tracking-custom text-sm font-normal pointer-events-none leading-[110%]"
       >
         <span id="mobile-overlay-counter"></span>
       </div>
@@ -466,14 +469,14 @@ const extendedProjects =
   const DURATION = 0.5;
   const DURATION_ALT = 0.5;
   const EASE = 'power3.out';
-  const COVER_DURATION = 0.9;
-  const COVER_STAGGER_WINDOW = 0.8;
-  const COVER_STAGGER_CURVE = 3;
+  const COVER_DURATION = 1;
+  const COVER_STAGGER_WINDOW = 1;
+  const COVER_STAGGER_EASE = 'power1.out';
   const FLIP_DURATION = 0.6;
   const SETTLE_DURATION = 0.6;
 
   const MOVE_DURATION = 0.8;
-  const MOVE_DELAY = 0.3;
+  const MOVE_DELAY = 0.6;
 
   const VERTICAL_THRESHOLD = 0.9;
   const INTENSITY_MULTIPLIER = 0.8;
@@ -506,11 +509,9 @@ const extendedProjects =
   const container = document.getElementById('gallery-container')!;
   const projectDetail = document.getElementById('project-detail')!;
   const projectListContainer = document.getElementById('project-list-container')!;
-  const detailProjectName = document.getElementById('detail-project-name')!;
-  const detailProjectType = document.getElementById('detail-project-type')!;
   const detailImageGallery = document.getElementById('detail-image-gallery');
 
-  if (!container || !projectDetail || !detailProjectName || !detailProjectType || !detailImageGallery) {
+  if (!container || !projectDetail || !detailImageGallery) {
     console.error('Missing essential DOM elements');
   } else {
 
@@ -614,9 +615,6 @@ const extendedProjects =
   }
 
   function populateProjectDetail(project: any) {
-    detailProjectName.textContent = project.name;
-    detailProjectType.textContent = project.type || '';
-
     // Clear existing gallery
     detailImageGallery!.innerHTML = '';
 
@@ -775,41 +773,35 @@ const extendedProjects =
     itemsToHide.sort(() => Math.random() - 0.5);
 
     const tl = gsap.timeline();
-    const totalItems = itemsToHide.length;
 
-    itemsToHide.forEach(({ item }, index) => {
+    // Set all covers to their starting position, collect into an array
+    const covers: HTMLElement[] = [];
+    for (const { item } of itemsToHide) {
       const cover = item.querySelector('.gallery-item-cover') as HTMLElement;
-      if (!cover) return;
+      if (!cover) continue;
+      gsap.set(cover, { y: cover.offsetHeight, immediateRender: true, overwrite: true });
+      covers.push(cover);
+    }
 
-      const coverHeight = cover.offsetHeight;
-      gsap.set(cover, { y: coverHeight, immediateRender: true, overwrite: true });
+    // Animate with GSAP's native stagger ease — no manual formula needed
+    tl.to(covers, {
+      y: 0,
+      duration: 1,
+      ease: 'power3.out',
+      overwrite: 'auto',
+      stagger: {
+        each: 0.4 / Math.max(covers.length - 1, 1),
 
-      const normalizedIndex = totalItems > 1 ? index / (totalItems - 1) : 0;
-      const staggerDelay = COVER_STAGGER_WINDOW * Math.pow(normalizedIndex, COVER_STAGGER_CURVE);
-
-      tl.to(cover, {
-        y: 0,
-        duration: COVER_DURATION,
-        ease: "power3.in",
-        overwrite: 'auto'
-      }, staggerDelay);
-    });
+      },
+    }, 0);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // STAGE 2: Set up layout and animate clone to target
     // ═══════════════════════════════════════════════════════════════════════════
 
     tl.call(() => {
-      const isLastRow = clickedRowIndex === allWrappers.length - 1;
-
-      if (!isLastRow) {
-        for (let i = 0; i <= clickedRowIndex; i++) {
-          allWrappers[i].style.display = 'none';
-        }
-      }
-
-      const firstVisibleRow = isLastRow ? 0 : clickedRowIndex + 1;
-      for (let i = firstVisibleRow; i < allWrappers.length; i++) {
+      // All rows are always visible below the project view
+      for (let i = 0; i < allWrappers.length; i++) {
         allWrappers[i].querySelectorAll('.gallery-item-cover').forEach(cover => {
           gsap.set(cover, { y: '100%' });
         });
@@ -842,12 +834,20 @@ const extendedProjects =
           left: targetRect.left,
           width: targetRect.width,
           height: targetRect.height,
-          delay: MOVE_DELAY,
-          duration: MOVE_DURATION,
+          delay: 0.1,
+          duration: 1.2,
           ease: "power3.out",
           onComplete: () => {
             clone.remove();
             targetMedia.style.visibility = 'visible';
+            // Fade the source gallery item back in so it appears in the gallery below
+            gsap.set(clickedMedia, { visibility: 'visible', opacity: 0 });
+            gsap.to(clickedMedia, { opacity: 1, duration: 0.6, ease: 'power3.out' });
+            if (clickedCaption) {
+              gsap.set(clickedCaption, { visibility: 'visible', opacity: 0 });
+              gsap.to(clickedCaption, { opacity: 1, duration: 0.6, ease: 'power3.out' });
+            }
+            clickedItem.style.pointerEvents = '';
           }
         });
 
@@ -855,30 +855,40 @@ const extendedProjects =
         const galleryCovers = detailImageGallery!.querySelectorAll('.gallery-image-cover');
         gsap.fromTo(galleryCovers,
           { y: 0 },
-          { y: '-100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: MOVE_DURATION + 0.4 }
+          { y: '100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: 0.8 }
         );
 
-        for (let i = clickedRowIndex + 1; i < allWrappers.length; i++) {
+        for (let i = 0; i < allWrappers.length; i++) {
           allWrappers[i].querySelectorAll('.gallery-item-cover').forEach(cover => {
             gsap.set(cover, { y: '100%' });
           });
         }
 
-        gsap.fromTo(detailProjectName, { opacity: 0 }, { opacity: 1, duration: 2, delay: 1, ease: "power2.out" });
-        gsap.fromTo(detailProjectType, { opacity: 0 }, { opacity: getMutedOpacity(), duration: 2, delay: 1.1, ease: "power2.out" });
         gsap.fromTo(projectListContainer, { opacity: 0 }, {
-          opacity: 1, duration: 2, delay: 1.2, ease: "power2.out", onComplete: () => {
+          opacity: 1, duration: 2, delay: 1.2, ease: "power3.out", onComplete: () => {
             projectListContainer.style.pointerEvents = 'auto';
           }
         });
 
         isAnimating = false;
         setupScrollObserver();
+        const scrollHint = document.getElementById('scroll-back-hint');
+        if (scrollHint) gsap.fromTo(scrollHint, { opacity: 0 }, { opacity: 1, duration: 2, delay: 0, ease: 'power3.out' });
 
       } else {
         clone.remove();
+        // Restore clicked item in case there was no target media
+        gsap.set(clickedMedia, { visibility: 'visible', opacity: 0 });
+        gsap.to(clickedMedia, { opacity: 1, duration: 0.6, ease: 'power2.out' });
+        if (clickedCaption) {
+          gsap.set(clickedCaption, { visibility: 'visible', opacity: 0 });
+          gsap.to(clickedCaption, { opacity: 1, duration: 0.6, ease: 'power2.out' });
+        }
+        clickedItem.style.pointerEvents = '';
         isAnimating = false;
         setupScrollObserver();
+        const scrollHint = document.getElementById('scroll-back-hint');
+        if (scrollHint) gsap.fromTo(scrollHint, { opacity: 0 }, { opacity: 1, duration: 2, delay: 0, ease: 'power3.out' });
       }
     });
   }
@@ -889,8 +899,7 @@ const extendedProjects =
     const lenis = (window as any).lenis;
     if (lenis) lenis.stop();
 
-    const isLastRow = clickedRowIndex === allWrappers.length - 1;
-    const firstVisibleIndex = isLastRow ? 0 : clickedRowIndex + 1;
+    const firstVisibleIndex = 0;
     const firstVisibleWrapper = allWrappers[firstVisibleIndex];
 
     const anchorRect = firstVisibleWrapper?.getBoundingClientRect();
@@ -901,6 +910,12 @@ const extendedProjects =
     currentProjectId = null;
 
     cleanupScrollObserver();
+
+    // Reset scroll hint
+    const scrollHint = document.getElementById('scroll-back-hint');
+    const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
+    if (scrollHint) gsap.set(scrollHint, { opacity: 0 });
+    if (scrollFill) scrollFill.style.clipPath = 'inset(0 100% 0 0)';
 
     projectDetail.classList.add('hidden');
 
@@ -983,7 +998,7 @@ const extendedProjects =
         const galleryCovers = detailImageGallery!.querySelectorAll('.gallery-image-cover');
         gsap.fromTo(galleryCovers,
           { y: 0 },
-          { y: '-100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: DURATION / 2 }
+          { y: '100%', duration: 1, ease: "power3.out ", stagger: 0.2, delay: DURATION / 2 }
         );
       }
     });
@@ -998,8 +1013,7 @@ const extendedProjects =
     if (scrollObserver) scrollObserver.disconnect();
     if (scrollHandler) window.removeEventListener('scroll', scrollHandler);
 
-    const isLastRow = clickedRowIndex === allWrappers.length - 1;
-    const firstVisibleIndex = isLastRow ? 0 : clickedRowIndex + 1;
+    const firstVisibleIndex = 0;
     const firstVisibleWrapper = allWrappers[firstVisibleIndex];
 
     if (!firstVisibleWrapper) return;
@@ -1022,6 +1036,15 @@ const extendedProjects =
       const wrapperRect = firstVisibleWrapper.getBoundingClientRect();
       if (wrapperRect.bottom <= 0) {
         closeProject(true);
+        return;
+      }
+      // Drive the left-to-right fill on the scroll hint
+      const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
+      if (scrollFill) {
+        const fillStart = window.innerHeight * 1.5; // start filling when wrapper is this far below viewport top
+        const fillEnd   = window.innerHeight * 0.3; // fully filled when wrapper is this far below viewport top
+        const progress  = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
+        scrollFill.style.clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`;
       }
     };
 
@@ -1146,9 +1169,7 @@ const extendedProjects =
   function resetAll() {
     if (activeRowIndex === -1) return;
 
-    const firstVisibleIndex = isProjectOpen
-      ? (clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1)
-      : 0;
+    const firstVisibleIndex = 0;
 
     for (let i = 0; i < allRows.length; i++) {
       if (isProjectOpen && i < firstVisibleIndex) continue;
@@ -1176,9 +1197,7 @@ const extendedProjects =
     }
 
     // Compute first visible index once
-    const firstVisibleIndex = isProjectOpen
-      ? (clickedRowIndex >= allWrappers.length - 1 ? 0 : clickedRowIndex + 1)
-      : 0;
+    const firstVisibleIndex = 0;
 
     if (isProjectOpen && clickedRowIndex >= 0) {
       const firstVisibleWrapper = allWrappers[firstVisibleIndex];
@@ -1993,9 +2012,7 @@ const extendedProjects =
       }
     }
 
-    if (detailProjectType && isProjectOpen) {
-      gsap.to(detailProjectType, { opacity: newOpacity });
-    }
+
   });
 
   } // End of else block for DOM element check
@@ -2264,6 +2281,7 @@ const extendedProjects =
 
   const overlayEl       = document.getElementById('mobile-overlay')           as HTMLElement;
   const overlayMediaEl  = document.getElementById('mobile-overlay-media')     as HTMLElement;
+  const overlayTrackEl  = document.getElementById('mobile-overlay-track')     as HTMLElement;
   const overlayNameEl   = document.getElementById('mobile-overlay-name')      as HTMLElement;
   const overlayIndexEl  = document.getElementById('mobile-overlay-index')     as HTMLElement;
   const overlayCountEl  = document.getElementById('mobile-overlay-counter')   as HTMLElement;
@@ -2456,36 +2474,79 @@ const extendedProjects =
     return items;
   }
 
-  function renderOverlayMedia(): void {
+  function buildOverlayTrack(): void {
     detachMuxControls();
-    overlayMediaEl.innerHTML = '';
-    const item = overlayItems[overlayIndex];
-    if (!item) return;
+    overlayTrackEl.innerHTML = '';
+    const slideW = overlayMediaEl.offsetWidth;
 
-    if (item.type === 'video') {
-      const player = document.createElement('mux-player') as MobileMuxPlayer;
-      player.setAttribute('playback-id', item.playbackId);
-      player.setAttribute('loop', '');
-      player.setAttribute('muted', '');
-      player.setAttribute('playsinline', '');
-      player.style.setProperty('--controls', 'none');
-      player.style.width = '100%';
-      player.style.maxHeight = '100%';
-      overlayMediaEl.appendChild(player);
+    overlayItems.forEach((item) => {
+      const slide = document.createElement('div');
+      slide.style.cssText = `flex: 0 0 ${slideW}px; width: ${slideW}px; height: 100%; display: flex; align-items: center; justify-content: center; padding: var(--spacing-padding, 0.375rem);`;
+
+      if (item.type === 'video') {
+        const player = document.createElement('mux-player') as MobileMuxPlayer;
+        player.setAttribute('playback-id', item.playbackId);
+        player.setAttribute('loop', '');
+        player.setAttribute('muted', '');
+        player.setAttribute('playsinline', '');
+        player.style.setProperty('--controls', 'none');
+        player.style.width = '100%';
+        player.style.maxHeight = '100%';
+        slide.appendChild(player);
+      } else {
+        const img = document.createElement('img');
+        img.src = item.url;
+        img.alt = item.alt;
+        img.draggable = false;
+        img.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain; display: block;';
+        slide.appendChild(img);
+      }
+
+      overlayTrackEl.appendChild(slide);
+    });
+  }
+
+  let overlayAnimating = false;
+
+  function goToOverlayIndex(i: number, animate = true): void {
+    i = Math.max(0, Math.min(i, overlayItems.length - 1));
+    overlayIndex = i;
+    overlayCountEl.textContent = `${i + 1}/${overlayItems.length}`;
+
+    const targetX = -(i * overlayMediaEl.offsetWidth);
+
+    // Sync mux controls to the newly-visible slide
+    const slide = overlayTrackEl.children[i] as HTMLElement | undefined;
+    const video = slide?.querySelector('mux-player') as MobileMuxPlayer | null;
+    if (video) {
       customElements.whenDefined('mux-player').then(() => {
-        player.play?.().catch(() => { /* autoplay blocked */ });
-        attachMuxControls(player);
+        attachMuxControls(video);
+        video.play?.().catch(() => {});
       });
     } else {
-      const img = document.createElement('img');
-      img.src = item.url;
-      img.alt = item.alt;
-      img.draggable = false;
-      img.className = 'max-w-full max-h-full object-contain block';
-      overlayMediaEl.appendChild(img);
+      detachMuxControls();
     }
 
-    overlayCountEl.textContent = `${overlayIndex + 1}/${overlayItems.length}`;
+    // Pause every video that is no longer visible
+    for (let j = 0; j < overlayTrackEl.children.length; j++) {
+      if (j !== i) {
+        const v = (overlayTrackEl.children[j] as HTMLElement).querySelector('mux-player') as MobileMuxPlayer | null;
+        v?.pause?.();
+      }
+    }
+
+    if (animate) {
+      overlayAnimating = true;
+      gsap.to(overlayTrackEl, {
+        x: targetX,
+        duration: 0.5,
+        ease: 'expo.out',
+        onComplete: () => { overlayAnimating = false; },
+      });
+    } else {
+      gsap.set(overlayTrackEl, { x: targetX });
+      overlayAnimating = false;
+    }
   }
 
   function openMobileOverlay(realIdx: number): void {
@@ -2496,15 +2557,14 @@ const extendedProjects =
     overlayItems = buildOverlayItems(project);
     if (overlayItems.length === 0) return;
 
-    overlayIndex = 0;
-
     overlayNameEl.textContent  = project.name ?? '';
     overlayIndexEl.textContent = String(project.index ?? '').padStart(3, '0');
 
     overlayEl.classList.remove('hidden');
     void overlayEl.offsetHeight;
 
-    renderOverlayMedia();
+    buildOverlayTrack();
+    goToOverlayIndex(0, false);
 
     overlayOpen = true;
     overlayEl.style.pointerEvents = 'auto';
@@ -2529,25 +2589,19 @@ const extendedProjects =
       onComplete() {
         overlayEl.classList.add('hidden');
         overlayEl.style.pointerEvents = 'none';
-        overlayMediaEl.innerHTML = '';
+        overlayTrackEl.innerHTML = '';
       },
     });
   }
 
   function overlayNext(): void {
-    if (!overlayOpen) return;
-    if (overlayIndex < overlayItems.length - 1) {
-      overlayIndex++;
-      renderOverlayMedia();
-    }
+    if (!overlayOpen || overlayAnimating) return;
+    goToOverlayIndex(overlayIndex + 1);
   }
 
   function overlayPrev(): void {
-    if (!overlayOpen) return;
-    if (overlayIndex > 0) {
-      overlayIndex--;
-      renderOverlayMedia();
-    }
+    if (!overlayOpen || overlayAnimating) return;
+    goToOverlayIndex(overlayIndex - 1);
   }
 
   overlayPrevZone.addEventListener('click', (e) => { e.preventDefault(); overlayPrev(); });
@@ -2560,6 +2614,67 @@ const extendedProjects =
     else if (e.key === 'ArrowRight') { e.preventDefault(); overlayNext();        }
     else if (e.key === 'ArrowLeft')  { e.preventDefault(); overlayPrev();        }
   });
+
+  // ── Drag / swipe for overlay track ───────────────────────────────────────
+  let overlayDragging      = false;
+  let overlayDragStartX    = 0;
+  let overlayDragStartY    = 0;
+  let overlayDragStartTX   = 0;
+  let overlayDragStartTime = 0;
+  const OVERLAY_SNAP_THRESHOLD = 50;
+  const OVERLAY_TAP_MAX_MOVE   = 10;
+  const OVERLAY_TAP_MAX_TIME   = 250;
+
+  overlayEl.addEventListener('touchstart', (e: TouchEvent) => {
+    if (!overlayOpen) return;
+    if (muxControls?.contains(e.target as Node)) return;
+    overlayDragStartX    = e.touches[0].clientX;
+    overlayDragStartY    = e.touches[0].clientY;
+    overlayDragStartTime = performance.now();
+    overlayDragStartTX   = gsap.getProperty(overlayTrackEl, 'x') as number;
+    overlayDragging      = true;
+    gsap.killTweensOf(overlayTrackEl);
+    overlayAnimating = false;
+  }, { passive: true });
+
+  overlayEl.addEventListener('touchmove', (e: TouchEvent) => {
+    if (!overlayDragging || !overlayOpen) return;
+    const dx = e.touches[0].clientX - overlayDragStartX;
+    const dy = e.touches[0].clientY - overlayDragStartY;
+    // Only take over once horizontal movement dominates
+    if (Math.abs(dx) > Math.abs(dy)) {
+      e.preventDefault();
+      // Elastic resistance at the first and last slide
+      let newX = overlayDragStartTX + dx;
+      const minX = -(overlayItems.length - 1) * overlayMediaEl.offsetWidth;
+      if (newX > 0)    newX = dx * 0.2;
+      if (newX < minX) newX = minX + (newX - minX) * 0.2;
+      gsap.set(overlayTrackEl, { x: newX });
+    }
+  }, { passive: false });
+
+  overlayEl.addEventListener('touchend', (e: TouchEvent) => {
+    if (!overlayDragging || !overlayOpen) return;
+    overlayDragging = false;
+    if (muxControls?.contains(e.target as Node)) return;
+    const dx = e.changedTouches[0].clientX - overlayDragStartX;
+    const dy = e.changedTouches[0].clientY - overlayDragStartY;
+    const dt = performance.now() - overlayDragStartTime;
+
+    // Tap — let the prev/next zone click handlers handle it
+    if (Math.abs(dx) < OVERLAY_TAP_MAX_MOVE && Math.abs(dy) < OVERLAY_TAP_MAX_MOVE && dt < OVERLAY_TAP_MAX_TIME) {
+      goToOverlayIndex(overlayIndex, true);
+      return;
+    }
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if      (dx < -OVERLAY_SNAP_THRESHOLD) goToOverlayIndex(overlayIndex + 1);
+      else if (dx >  OVERLAY_SNAP_THRESHOLD) goToOverlayIndex(overlayIndex - 1);
+      else                                   goToOverlayIndex(overlayIndex);
+    } else {
+      goToOverlayIndex(overlayIndex);
+    }
+  }, { passive: true });
 
   } // End of `if (!slider || !track)` else block
 
