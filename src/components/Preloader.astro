@@ -1,0 +1,135 @@
+---
+interface Props {
+    thumbnails: string[];
+}
+const { thumbnails } = Astro.props;
+---
+
+<div
+    id="preloader"
+    class="fixed inset-0 bg-white flex flex-col items-center justify-center"
+    style="z-index: 99999;"
+>
+    <div style="overflow: hidden; line-height: 1;">
+        <p id="preloader-name" class="font-normal text-md tracking-custom uppercase">
+            Justin Abernethy
+        </p>
+    </div>
+
+    <div class="relative overflow-hidden" style="width: 104px; height: 130px; margin-top: 10px;">
+        <img
+            id="preloader-img"
+            src=""
+            alt=""
+            class="w-full h-full object-cover"
+            style="opacity: 0;"
+        />
+        <div
+            id="preloader-cover"
+            class="absolute inset-0 bg-white"
+            style="transform: translateY(-100%);"
+        ></div>
+    </div>
+
+    <p
+        id="preloader-progress"
+        class="absolute font-normal text-md tracking-custom uppercase"
+        style="bottom: 60px;"
+    >
+        0%
+    </p>
+</div>
+
+<script define:vars={{ thumbnails }}>
+    (function () {
+        var preloader = document.getElementById("preloader");
+
+
+
+        var imgEl = document.getElementById("preloader-img");
+        var progressEl = document.getElementById("preloader-progress");
+
+        if (!preloader || !imgEl || !progressEl || !thumbnails.length) {
+            if (preloader) preloader.remove();
+            return;
+        }
+
+        var total = thumbnails.length;
+        var ANIM_DURATION = 8000;
+
+        function expoInOut(t) {
+            if (t <= 0) return 0;
+            if (t >= 1) return 1;
+            return t < 0.5
+                ? Math.pow(2, 20 * t - 10) / 2
+                : (2 - Math.pow(2, -20 * t + 10)) / 2;
+        }
+
+        function finish() {
+            sessionStorage.setItem("preloader-shown", "1");
+            preloader.style.transition = "opacity 0.5s ease-out";
+            preloader.style.opacity = "0";
+            preloader.addEventListener(
+                "transitionend",
+                function () {
+                    preloader.remove();
+                },
+                { once: true },
+            );
+        }
+
+        function runExitAnimation() {
+            var nameEl = document.getElementById("preloader-name");
+            var cover = document.getElementById("preloader-cover");
+
+            // Name slides below its baseline (mask out, ease-in)
+            nameEl.style.transition =
+                "transform 0.45s cubic-bezier(0.5, 0, 0.75, 0)";
+            nameEl.style.transform = "translateY(100%)";
+
+            // White cover sweeps down over the image (ease-out)
+            cover.style.transition =
+                "transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)";
+            cover.style.transform = "translateY(0%)";
+
+            // Brief pause after animations settle, then fade out
+            setTimeout(function () {
+                finish();
+            }, 700);
+        }
+
+        function runAnimation() {
+            imgEl.style.opacity = "1";
+            var start = performance.now();
+
+            function frame(now) {
+                var elapsed = Math.min(now - start, ANIM_DURATION);
+                var progress = expoInOut(elapsed / ANIM_DURATION);
+
+                progressEl.textContent = Math.round(progress * 100) + "%";
+
+                var idx = Math.min(Math.floor(progress * total), total - 1);
+                imgEl.src = thumbnails[idx];
+
+                if (elapsed < ANIM_DURATION) {
+                    requestAnimationFrame(frame);
+                } else {
+                    runExitAnimation();
+                }
+            }
+
+            requestAnimationFrame(frame);
+        }
+
+        // Preload all images in parallel, then animate
+        var loaded = 0;
+        thumbnails.forEach(function (url) {
+            var img = new window.Image();
+            img.onload = img.onerror = function () {
+                loaded++;
+                if (loaded === total) runAnimation();
+            };
+            img.src = url;
+        });
+    })();
+</script>
