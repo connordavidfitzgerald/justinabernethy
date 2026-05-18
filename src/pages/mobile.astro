@@ -3,6 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import { MuxPlayer } from '@mux/mux-player-astro';
 import { loadQuery } from '../sanity/lib/loadQuery.ts';
 import { urlForImage } from '../sanity/lib/url-for-image.ts';
+import headshotImg from "../assets/images/JAFINALHEADSHOT.jpg";
 
 const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
   _id,
@@ -50,15 +51,23 @@ const projectsWithUrls = projects.map((project: any) => ({
       })) ?? [],
 }));
 
+// Project 00: info slide
+const infoSlide = {
+  _id: '__info__',
+  name: null,
+  type: null,
+  index: 0,
+  thumbnailUrl: headshotImg.src,
+  galleryUrls: [] as { url: string; _key: string }[],
+};
+
+const allSlides = [...projectsWithUrls, infoSlide];
+
 // Build extended list for infinite looping:
-// [clone-of-last, ...real-items, clone-of-first]
-const extendedProjects =
-  projectsWithUrls.length > 0
-    ? [
-        projectsWithUrls[projectsWithUrls.length - 1],
-        ...projectsWithUrls,
-        projectsWithUrls[0],
-      ]
+// [clone-of-last, ...all-slides, clone-of-first]
+const extendedSlides =
+  allSlides.length > 0
+    ? [allSlides[allSlides.length - 1], ...allSlides, allSlides[0]]
     : [];
 ---
 
@@ -67,6 +76,7 @@ const extendedProjects =
     <div
       id="mobile-slider"
       class="h-full w-full relative overflow-hidden touch-none select-none"
+      data-slide-count={allSlides.length}
     >
 
       <!-- Track: absolutely positioned so GSAP can translateY it freely -->
@@ -74,42 +84,50 @@ const extendedProjects =
             id="slider-track"
             class="absolute left-0 right-0 flex flex-col"
           >
-        {extendedProjects.map((project: any, i: number) => {
+        {extendedSlides.map((slide: any, i: number) => {
           const isCloneFirst = i === 0;
-          const isCloneLast  = i === extendedProjects.length - 1;
+          const isCloneLast  = i === extendedSlides.length - 1;
           const realIndex = isCloneFirst
-            ? projectsWithUrls.length - 1
+            ? allSlides.length - 1
             : isCloneLast
               ? 0
               : i - 1;
 
           return (
-          <div
-                      class="slider-slide w-full shrink-0 flex items-center"
-                      data-real-index={realIndex}
-                      data-virtual-index={i}
-                    >
-              {project.thumbnailUrl ? (
+            <div
+              class="slider-slide w-full shrink-0 flex items-center"
+              data-real-index={realIndex}
+              data-virtual-index={i}
+            >
+              {slide._id === '__info__' ? (
                 <img
-                  src={project.thumbnailUrl}
-                  alt={project.name ?? ''}
+                  src={headshotImg.src}
+                  alt="Justin Abernethy"
+                  class="w-full object-cover block"
+                  style="aspect-ratio: 5/7;"
+                  loading="eager"
+                  draggable="false"
+                />
+              ) : slide.thumbnailUrl ? (
+                <img
+                  src={slide.thumbnailUrl}
+                  alt={slide.name ?? ''}
                   class="w-full object-cover block"
                   style="aspect-ratio: 5/7;"
                   loading={i <= 2 ? 'eager' : 'lazy'}
                   draggable="false"
                 />
-              ) : project.muxID ? (
-              <div class="aspect-5/7 flex flex-col justify-center">
+              ) : slide.muxID ? (
+                <div class="aspect-5/7 flex flex-col justify-center">
                   <MuxPlayer
-                    playbackId={project.muxID}
+                    playbackId={slide.muxID}
                     streamType="on-demand"
                     loop={true}
                     muted={true}
                     autoplay
                     style="aspect-ratio: 16/9; width: 100%; display: block; object-fit: cover;"
                   />
-              </div>
-
+                </div>
               ) : (
                 <div
                   class="w-full bg-gray-800 block"
@@ -124,9 +142,9 @@ const extendedProjects =
       <!-- Center info overlay: top edge aligns with bottom edge of centred slide -->
       <div
         id="center-info"
-        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-center text-white mix-blend-difference uppercase tracking-custom text-sm font-medium pointer-events-none z-10 "
+        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-start text-white mix-blend-difference uppercase tracking-custom text-sm font-medium pointer-events-none z-10"
       >
-           <span id="center-name"  class="leading-[110%]"></span>
+        <div id="center-name" class="leading-[110%]"></div>
         <span id="center-index" class="leading-[110%]"></span>
 
 
@@ -185,7 +203,7 @@ const extendedProjects =
 </Layout>
 
 <!-- Expose serialised project data to the module script below -->
-<script define:vars={{ projectsData: projectsWithUrls }}>
+<script define:vars={{ projectsData: allSlides }}>
   window.__MOBILE_PROJECTS__ = projectsData;
 </script>
 
@@ -210,14 +228,14 @@ const extendedProjects =
 
   // ── Project data (injected by the define:vars script above) ──────────────────
   const projects: any[] = (window as any).__MOBILE_PROJECTS__ ?? [];
-  const n = projects.length;
+  const n = parseInt(slider.dataset.slideCount ?? '0', 10);
 
   if (n === 0 && centerInfo) {
     centerInfo.style.display = 'none';
   }
 
   // ── State ─────────────────────────────────────────────────────────────────────
-  let currentVirtualIndex = 1;  // 1 = first real item in the extended array
+  let currentVirtualIndex = 1;
   let currentTranslateY   = 0;
   let animating           = false;
   let isDragging          = false;
@@ -263,6 +281,14 @@ const extendedProjects =
     const realIdx = vi === 0 ? n - 1 : vi === n + 1 ? 0 : vi - 1;
     const project = projects[realIdx];
     if (!project) return;
+    if (project._id === '__info__') {
+      centerNameEl.innerHTML =
+        '<span style="display:block">Director and Photographer from Toronto.</span>' +
+        '<span style="display:block;opacity:0.5">info@justinabernethy.com</span>' +
+        '<span style="display:flex;gap:2.5rem">Instagram<span>Vimeo</span></span>';
+      centerIndexEl.textContent = '00';
+      return;
+    }
     centerNameEl.textContent  = project.name ?? '';
     centerIndexEl.textContent = String(
       typeof project.index === 'number' ? project.index : realIdx + 1,
@@ -438,8 +464,8 @@ const extendedProjects =
     // Defer one frame so offsetHeight is available after first layout pass.
     requestAnimationFrame(() => {
       sizeSlides();
+      console.log('[slider] n=', n, 'DOM slides=', slides.length, 'projects=', projects.length, 'last project id=', projects[n-1]?._id);
       goToVirtual(1, false);
-
       updateInfoText(1);
     });
   }
@@ -514,6 +540,7 @@ const extendedProjects =
     if (n === 0) return;
     const project = projects[realIdx];
     if (!project) return;
+    if (project._id === '__info__') return;
 
     overlayItems = buildOverlayItems(project);
     if (overlayItems.length === 0) return;

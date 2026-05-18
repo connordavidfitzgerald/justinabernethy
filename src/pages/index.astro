@@ -69,15 +69,23 @@ const preloaderThumbnails = projectsWithUrls
     .map((p: any) => p.thumbnailUrl)
     .filter(Boolean) as string[];
 
+// Info slide (project 00) for mobile slider
+const infoSlide = {
+  _id: '__info__',
+  name: null,
+  type: null,
+  index: 0,
+  thumbnailUrl: headshot.src,
+  galleryUrls: [] as { url: string; _key: string }[],
+};
+
+const allSlides = [...projectsWithUrls, infoSlide];
+
 // Extended list for mobile slider's infinite loop:
 // [clone-of-last, ...real-items, clone-of-first]
 const extendedProjects =
-  projectsWithUrls.length > 0
-    ? [
-        projectsWithUrls[projectsWithUrls.length - 1],
-        ...projectsWithUrls,
-        projectsWithUrls[0],
-      ]
+  allSlides.length > 0
+    ? [allSlides[allSlides.length - 1], ...allSlides, allSlides[0]]
     : [];
 ---
 
@@ -235,7 +243,7 @@ const extendedProjects =
           </div>
         </div>
         <!-- Scroll back hint -->
-        <div id="scroll-back-hint" class="w-full flex flex-col justify-center items-center pt-80 text-sm uppercase tracking-custom font-normal select-none pointer-events-none" style="opacity: 0;">
+        <div id="scroll-back-hint" class="sticky top-0 w-full flex flex-col justify-center items-center h-screen text-sm uppercase tracking-custom font-normal select-none pointer-events-none" style="opacity: 0;">
           <div class="relative">
             <span class="opacity-[var(--opacity-muted)]">scroll to go back to projects</span>
             <span id="scroll-back-fill" class="absolute inset-0 overflow-hidden whitespace-nowrap" style="clip-path: inset(0 100% 0 0);">scroll to go back to projects</span>
@@ -317,6 +325,7 @@ const extendedProjects =
     <div
       id="mobile-slider"
       class="h-full w-full relative overflow-hidden touch-none select-none"
+      data-slide-count={allSlides.length}
     >
       <div
         id="slider-track"
@@ -326,7 +335,7 @@ const extendedProjects =
           const isCloneFirst = i === 0;
           const isCloneLast  = i === extendedProjects.length - 1;
           const realIndex = isCloneFirst
-            ? projectsWithUrls.length - 1
+            ? allSlides.length - 1
             : isCloneLast
               ? 0
               : i - 1;
@@ -373,10 +382,10 @@ const extendedProjects =
 
       <div
         id="center-info"
-        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-center text-white mix-blend-difference uppercase tracking-custom text-sm font-normal pointer-events-none z-10000"
+        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-start text-white mix-blend-difference uppercase tracking-custom text-sm font-normal pointer-events-none z-10000"
       >
-          <span id="center-name"  class="leading-[110%]"></span>
-          <span id="center-index" class="leading-[110%]"></span>
+        <div id="center-name" class="leading-[110%]"></div>
+        <span id="center-index" class="leading-[110%]"></span>
 
 
       </div>
@@ -453,10 +462,17 @@ const extendedProjects =
 </Layout>
 
 <!-- Pass project data to client -->
-<script define:vars={{ projectsWithUrls, ROW_SIZE }}>
+<script define:vars={{ projectsWithUrls, ROW_SIZE, headshotSrc: headshot.src }}>
   window.__PROJECTS_DATA__   = projectsWithUrls;
   window.__ROW_SIZE__        = ROW_SIZE;
-  window.__MOBILE_PROJECTS__ = projectsWithUrls;
+  window.__MOBILE_PROJECTS__ = [...projectsWithUrls, {
+    _id: '__info__',
+    name: null,
+    type: null,
+    index: 0,
+    thumbnailUrl: headshotSrc,
+    galleryUrls: [],
+  }];
 </script>
 
 <script>
@@ -2057,7 +2073,7 @@ const extendedProjects =
   );
 
   const projects: any[] = (window as any).__MOBILE_PROJECTS__ ?? [];
-  const n = projects.length;
+  const n = parseInt(slider.dataset.slideCount ?? '0', 10);
 
   if (n === 0 && centerInfo) {
     centerInfo.style.display = 'none';
@@ -2103,6 +2119,14 @@ const extendedProjects =
     const realIdx = vi === 0 ? n - 1 : vi === n + 1 ? 0 : vi - 1;
     const project = projects[realIdx];
     if (!project) return;
+    if (project._id === '__info__') {
+      centerNameEl.innerHTML =
+        '<span style="display:block">Director and Photographer from Toronto.</span>' +
+        '<span style="display:block;opacity:0.5">info@justinabernethy.com</span>' +
+        '<span style="display:flex;gap:2.5rem;padding-top:4rem;">Instagram<span>Vimeo</span></span>';
+      centerIndexEl.textContent = '000';
+      return;
+    }
     centerNameEl.textContent  = project.name ?? '';
     centerIndexEl.textContent = String(project.index ?? '').padStart(3, '0');
   }
@@ -2466,7 +2490,7 @@ const extendedProjects =
 
   let overlayOpen  = false;
   let overlayItems: OverlayMedia[] = [];
-  let overlayIndex = 0;
+  let overlayVirtual = 1; // virtual index into extended track (1 = first real item)
 
   function buildOverlayItems(project: any): OverlayMedia[] {
     const items: OverlayMedia[] = [];
@@ -2487,8 +2511,13 @@ const extendedProjects =
     detachMuxControls();
     overlayTrackEl.innerHTML = '';
     const slideW = overlayMediaEl.offsetWidth;
+    const m = overlayItems.length;
+    if (m === 0) return;
 
-    overlayItems.forEach((item) => {
+    // Extended: [clone-of-last, ...real-items, clone-of-first]
+    const extended = [overlayItems[m - 1], ...overlayItems, overlayItems[0]];
+
+    extended.forEach((item) => {
       const slide = document.createElement('div');
       slide.style.cssText = `flex: 0 0 ${slideW}px; width: ${slideW}px; height: 100%; display: flex; align-items: center; justify-content: center; padding: var(--spacing-padding, 0.375rem);`;
 
@@ -2517,15 +2546,17 @@ const extendedProjects =
 
   let overlayAnimating = false;
 
-  function goToOverlayIndex(i: number, animate = true): void {
-    i = Math.max(0, Math.min(i, overlayItems.length - 1));
-    overlayIndex = i;
-    overlayCountEl.textContent = `${i + 1}/${overlayItems.length}`;
+  function goToOverlayVirtual(vi: number, animate = true): void {
+    const m = overlayItems.length;
+    if (m === 0) return;
+    const realIdx = vi === 0 ? m - 1 : vi === m + 1 ? 0 : vi - 1;
+    overlayVirtual = vi;
+    overlayCountEl.textContent = `${realIdx + 1}/${m}`;
 
-    const targetX = -(i * overlayMediaEl.offsetWidth);
+    const targetX = -(vi * overlayMediaEl.offsetWidth);
 
     // Sync mux controls to the newly-visible slide
-    const slide = overlayTrackEl.children[i] as HTMLElement | undefined;
+    const slide = overlayTrackEl.children[vi] as HTMLElement | undefined;
     const video = slide?.querySelector('mux-player') as MobileMuxPlayer | null;
     if (video) {
       customElements.whenDefined('mux-player').then(() => {
@@ -2536,9 +2567,9 @@ const extendedProjects =
       detachMuxControls();
     }
 
-    // Pause every video that is no longer visible
+    // Pause every video not currently shown
     for (let j = 0; j < overlayTrackEl.children.length; j++) {
-      if (j !== i) {
+      if (j !== vi) {
         const v = (overlayTrackEl.children[j] as HTMLElement).querySelector('mux-player') as MobileMuxPlayer | null;
         v?.pause?.();
       }
@@ -2550,7 +2581,11 @@ const extendedProjects =
         x: targetX,
         duration: 0.5,
         ease: 'expo.out',
-        onComplete: () => { overlayAnimating = false; },
+        onComplete: () => {
+          overlayAnimating = false;
+          if (vi === 0)     goToOverlayVirtual(m, false);
+          if (vi === m + 1) goToOverlayVirtual(1, false);
+        },
       });
     } else {
       gsap.set(overlayTrackEl, { x: targetX });
@@ -2562,6 +2597,7 @@ const extendedProjects =
     if (n === 0) return;
     const project = projects[realIdx];
     if (!project) return;
+    if (project._id === '__info__') return;
 
     overlayItems = buildOverlayItems(project);
     if (overlayItems.length === 0) return;
@@ -2572,8 +2608,9 @@ const extendedProjects =
     overlayEl.classList.remove('hidden');
     void overlayEl.offsetHeight;
 
+    overlayVirtual = 1;
     buildOverlayTrack();
-    goToOverlayIndex(0, false);
+    goToOverlayVirtual(1, false);
 
     overlayOpen = true;
     overlayEl.style.pointerEvents = 'auto';
@@ -2605,12 +2642,12 @@ const extendedProjects =
 
   function overlayNext(): void {
     if (!overlayOpen || overlayAnimating) return;
-    goToOverlayIndex(overlayIndex + 1);
+    goToOverlayVirtual(overlayVirtual + 1);
   }
 
   function overlayPrev(): void {
     if (!overlayOpen || overlayAnimating) return;
-    goToOverlayIndex(overlayIndex - 1);
+    goToOverlayVirtual(overlayVirtual - 1);
   }
 
   overlayPrevZone.addEventListener('click', (e) => { e.preventDefault(); overlayPrev(); });
@@ -2653,12 +2690,7 @@ const extendedProjects =
     // Only take over once horizontal movement dominates
     if (Math.abs(dx) > Math.abs(dy)) {
       e.preventDefault();
-      // Elastic resistance at the first and last slide
-      let newX = overlayDragStartTX + dx;
-      const minX = -(overlayItems.length - 1) * overlayMediaEl.offsetWidth;
-      if (newX > 0)    newX = dx * 0.2;
-      if (newX < minX) newX = minX + (newX - minX) * 0.2;
-      gsap.set(overlayTrackEl, { x: newX });
+      gsap.set(overlayTrackEl, { x: overlayDragStartTX + dx });
     }
   }, { passive: false });
 
@@ -2672,16 +2704,16 @@ const extendedProjects =
 
     // Tap — let the prev/next zone click handlers handle it
     if (Math.abs(dx) < OVERLAY_TAP_MAX_MOVE && Math.abs(dy) < OVERLAY_TAP_MAX_MOVE && dt < OVERLAY_TAP_MAX_TIME) {
-      goToOverlayIndex(overlayIndex, true);
+      goToOverlayVirtual(overlayVirtual, true);
       return;
     }
 
     if (Math.abs(dx) > Math.abs(dy)) {
-      if      (dx < -OVERLAY_SNAP_THRESHOLD) goToOverlayIndex(overlayIndex + 1);
-      else if (dx >  OVERLAY_SNAP_THRESHOLD) goToOverlayIndex(overlayIndex - 1);
-      else                                   goToOverlayIndex(overlayIndex);
+      if      (dx < -OVERLAY_SNAP_THRESHOLD) goToOverlayVirtual(overlayVirtual + 1);
+      else if (dx >  OVERLAY_SNAP_THRESHOLD) goToOverlayVirtual(overlayVirtual - 1);
+      else                                   goToOverlayVirtual(overlayVirtual);
     } else {
-      goToOverlayIndex(overlayIndex);
+      goToOverlayVirtual(overlayVirtual);
     }
   }, { passive: true });
 
