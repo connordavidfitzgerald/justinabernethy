@@ -243,7 +243,7 @@ const extendedProjects =
           </div>
         </div>
         <!-- Scroll back hint -->
-        <div id="scroll-back-hint" class="sticky top-0 w-full flex flex-col justify-center items-center h-screen text-sm uppercase tracking-custom font-normal select-none pointer-events-none" style="opacity: 0;">
+        <div id="scroll-back-hint" class="fixed inset-0 z-30 bg-theme flex flex-col justify-center items-center text-sm uppercase tracking-custom font-normal select-none pointer-events-none" style="opacity: 0;">
           <div class="relative">
             <span class="opacity-[var(--opacity-muted)]">scroll to go back to projects</span>
             <span id="scroll-back-fill" class="absolute inset-0 overflow-hidden whitespace-nowrap" style="clip-path: inset(0 100% 0 0);">scroll to go back to projects</span>
@@ -837,7 +837,7 @@ const extendedProjects =
       savedMaxDelta = deltas.length > 0 ? Math.max(...deltas) : 0;
 
       setWrapperYInstant(container as any, 0); // container isn't a wrapper but harmless to track
-      gsap.set(container, { y: 0, marginTop: savedMaxDelta * 2 });
+      gsap.set(container, { y: 0, marginTop: window.innerHeight });
 
       container.parentElement?.insertBefore(projectDetail, container);
 
@@ -897,8 +897,6 @@ const extendedProjects =
 
         isAnimating = false;
         setupScrollObserver();
-        const scrollHint = document.getElementById('scroll-back-hint');
-        if (scrollHint) gsap.fromTo(scrollHint, { opacity: 0 }, { opacity: 1, duration: 2, delay: 0, ease: 'power3.out' });
 
       } else {
         clone.remove();
@@ -912,8 +910,6 @@ const extendedProjects =
         clickedItem.style.pointerEvents = '';
         isAnimating = false;
         setupScrollObserver();
-        const scrollHint = document.getElementById('scroll-back-hint');
-        if (scrollHint) gsap.fromTo(scrollHint, { opacity: 0 }, { opacity: 1, duration: 2, delay: 0, ease: 'power3.out' });
       }
     });
   }
@@ -937,9 +933,12 @@ const extendedProjects =
     cleanupScrollObserver();
 
     // Reset scroll hint
-    const scrollHint = document.getElementById('scroll-back-hint');
+    const scrollHint = document.getElementById('scroll-back-hint') as HTMLElement | null;
     const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
-    if (scrollHint) gsap.set(scrollHint, { opacity: 0 });
+    if (scrollHint) {
+      gsap.set(scrollHint, { opacity: 0 });
+      scrollHint.style.transform = 'translateY(0)';
+    }
     if (scrollFill) scrollFill.style.clipPath = 'inset(0 100% 0 0)';
 
     projectDetail.classList.add('hidden');
@@ -1063,13 +1062,28 @@ const extendedProjects =
         closeProject(true);
         return;
       }
-      // Drive the left-to-right fill on the scroll hint
       const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
+      const hintEl     = document.getElementById('scroll-back-hint') as HTMLElement | null;
+      const fillStart  = window.innerHeight * 1.2;        // begin once the gallery row enters the viewport
+      const fillEnd    = window.innerHeight * -0.1; // complete when it's 10% above the top edge
+      const progress   = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
+
       if (scrollFill) {
-        const fillStart = window.innerHeight * 1.5; // start filling when wrapper is this far below viewport top
-        const fillEnd   = window.innerHeight * 0.3; // fully filled when wrapper is this far below viewport top
-        const progress  = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
         scrollFill.style.clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`;
+      }
+
+      if (hintEl) {
+        // Fade in quickly as we enter the zone
+        hintEl.style.opacity = String(Math.min(1, progress * 8));
+
+        // Phase 2 (last 30%): slide hint upward so gallery rows peek in from below
+        const REVEAL_START = 0.7;
+        if (progress > REVEAL_START) {
+          const t = (progress - REVEAL_START) / (1 - REVEAL_START);
+          hintEl.style.transform = `translateY(${-t * 100}%)`;
+        } else {
+          hintEl.style.transform = 'translateY(0)';
+        }
       }
     };
 
