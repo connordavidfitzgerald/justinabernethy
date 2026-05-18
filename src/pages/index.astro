@@ -837,7 +837,7 @@ const extendedProjects =
       savedMaxDelta = deltas.length > 0 ? Math.max(...deltas) : 0;
 
       setWrapperYInstant(container as any, 0); // container isn't a wrapper but harmless to track
-      gsap.set(container, { y: 0, marginTop: window.innerHeight });
+      gsap.set(container, { y: 0, marginTop: window.innerHeight * 1.2 });
 
       container.parentElement?.insertBefore(projectDetail, container);
 
@@ -1064,7 +1064,7 @@ const extendedProjects =
       }
       const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
       const hintEl     = document.getElementById('scroll-back-hint') as HTMLElement | null;
-      const fillStart  = window.innerHeight * 1.2;        // begin once the gallery row enters the viewport
+      const fillStart  = window.innerHeight * 1.25;        // begin once the gallery row enters the viewport
       const fillEnd    = window.innerHeight * -0.1; // complete when it's 10% above the top edge
       const progress   = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
 
