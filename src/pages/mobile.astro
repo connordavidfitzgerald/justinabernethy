@@ -125,6 +125,7 @@ const extendedSlides =
                     loop={true}
                     muted={true}
                     autoplay
+                    disable-tracking
                     style="aspect-ratio: 16/9; width: 100%; display: block; object-fit: cover;"
                   />
                 </div>
@@ -519,6 +520,7 @@ const extendedSlides =
       player.setAttribute('loop', '');
       player.setAttribute('muted', '');
       player.setAttribute('playsinline', '');
+      player.setAttribute('disable-tracking', '');
       player.style.setProperty('--controls', 'none');
       player.style.width = '100%';
       player.style.maxHeight = '100%';

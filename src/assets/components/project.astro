@@ -53,6 +53,7 @@ const { data: projects } = await loadQuery({ query: PROJECTS_QUERY });
                                             style={{ '--controls': 'none' }}
                                             muted
                                             loop
+                                            disable-tracking
                                         />
                                     ) : project.thumbnail?.asset ? (
                                         <img

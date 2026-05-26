@@ -240,6 +240,7 @@ const extendedProjects =
                               style={{ '--controls': 'none' }}
                               muted
                               loop
+                              disable-tracking
                             />
                           ) : project.thumbnailUrl ? (
                             <img
@@ -705,6 +706,7 @@ const extendedProjects =
           muted
           loop
           autoplay
+          disable-tracking
           data-flip-id="media-${project._id}"
         ></mux-player>
       `;
@@ -1275,6 +1277,7 @@ const extendedProjects =
         player.setAttribute('loop', '');
         player.setAttribute('preload', 'none');
         player.setAttribute('plays-inline', '');
+        player.setAttribute('disable-tracking', '');
         player.style.cssText =
           'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;--controls:none;opacity:0;transition:opacity 0.3s;';
         muxWrapper.appendChild(player);
@@ -1940,6 +1943,7 @@ const extendedProjects =
       player.setAttribute('loop', '');
       player.setAttribute('muted', '');
       player.setAttribute('playsinline', '');
+      player.setAttribute('disable-tracking', '');
       player.style.setProperty('--controls', 'none');
       overlayMediaContainer.appendChild(player);
 
@@ -2781,6 +2785,7 @@ const extendedProjects =
         player.setAttribute('loop', '');
         player.setAttribute('muted', '');
         player.setAttribute('playsinline', '');
+        player.setAttribute('disable-tracking', '');
         player.style.setProperty('--controls', 'none');
         player.style.width = '100%';
         player.style.maxHeight = '100%';
