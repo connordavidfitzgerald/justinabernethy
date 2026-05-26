@@ -166,14 +166,20 @@ const extendedProjects =
                       <div class="gallery-item-cover absolute -inset-1 bg-theme z-10 pointer-events-none" style="transform: translateY(100%)"></div>
 
                       {project.muxID && !project.thumbnail?.asset ? (
-                        <MuxPlayer
-                          playbackId={project.muxID}
-                          class="item-media w-full object-cover aspect-16/9"
-                          style={{ '--controls': 'none' }}
-                          muted
-                          loop
+                        <div
+                          class="item-media relative w-full overflow-hidden"
+                          style="aspect-ratio: 16/9"
                           data-flip-id={`media-${project._id}`}
-                        />
+                          data-mux-id={project.muxID}
+                        >
+                          <img
+                            src={`https://image.mux.com/${project.muxID}/thumbnail.jpg?width=900&fit_mode=smartcrop`}
+                            alt={project.name ?? ''}
+                            class="mux-thumb absolute inset-0 w-full h-full object-cover"
+                            style="transition: opacity 0.3s;"
+                            fetchpriority={rowIndex === 0 ? 'high' : undefined}
+                          />
+                        </div>
                       ) : (
                         <img
                           src={urlForImage(project.thumbnail).width(900).quality(80).auto('format').url()}
@@ -386,17 +392,13 @@ const extendedProjects =
                 />
               ) : project.muxID ? (
                 <div class="w-full flex items-center justify-center" style="aspect-ratio: 5/7;">
-                  <div class="w-full" style="aspect-ratio: 16/9;">
-                    <MuxPlayer
-                      playbackId={project.muxID}
-                      streamType="on-demand"
-                      loop={true}
-                      muted={true}
-                      autoplay
-                      playsInline
-                      style="width: 100%; height: 100%; display: block; --controls: none;"
-                    />
-                  </div>
+                  <img
+                    src={`https://image.mux.com/${project.muxID}/thumbnail.jpg?width=900&fit_mode=smartcrop`}
+                    alt={project.name ?? ''}
+                    class="w-full object-cover block"
+                    style="aspect-ratio: 16/9;"
+                    draggable="false"
+                  />
                 </div>
               ) : (
                 <div
@@ -698,6 +700,7 @@ const extendedProjects =
           style="--controls: none"
           muted
           loop
+          autoplay
           data-flip-id="media-${project._id}"
         ></mux-player>
       `;
@@ -1248,6 +1251,41 @@ const extendedProjects =
           setTimeout(() => openProject(projectId, item), 50);
         }
       }
+    });
+  }
+
+  // Mux hover-play: inject player lazily on first hover, fade thumb ↔ video
+  for (const item of allItems) {
+    const muxWrapper = item.querySelector<HTMLElement>('[data-mux-id]');
+    if (!muxWrapper) continue;
+    const muxId = muxWrapper.dataset.muxId!;
+
+    item.addEventListener('mouseenter', () => {
+      const thumb = muxWrapper.querySelector<HTMLElement>('.mux-thumb');
+      let player = muxWrapper.querySelector<any>('mux-player');
+
+      if (!player) {
+        player = document.createElement('mux-player') as any;
+        player.setAttribute('playback-id', muxId);
+        player.setAttribute('muted', '');
+        player.setAttribute('loop', '');
+        player.setAttribute('preload', 'none');
+        player.setAttribute('plays-inline', '');
+        player.style.cssText =
+          'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;--controls:none;opacity:0;transition:opacity 0.3s;';
+        muxWrapper.appendChild(player);
+      }
+
+      player.play().catch(() => {});
+      player.style.opacity = '1';
+      if (thumb) thumb.style.opacity = '0';
+    });
+
+    item.addEventListener('mouseleave', () => {
+      const thumb = muxWrapper.querySelector<HTMLElement>('.mux-thumb');
+      const player = muxWrapper.querySelector<any>('mux-player');
+      if (player) { player.pause(); player.style.opacity = '0'; }
+      if (thumb) thumb.style.opacity = '1';
     });
   }
 
