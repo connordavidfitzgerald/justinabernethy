@@ -7,33 +7,32 @@ const { thumbnails } = Astro.props;
 
 <div
     id="preloader"
-    class="fixed inset-0 bg-white flex flex-col items-center justify-center"
+    class="fixed inset-0 bg-theme text-theme"
     style="z-index: 99999;"
 >
-    <div style="overflow: hidden; line-height: 1;">
-        <p id="preloader-name" class="font-normal text-md tracking-custom uppercase">
-            Justin Abernethy
-        </p>
-    </div>
-
-    <div class="relative overflow-hidden" style="width: 104px; height: 130px; margin-top: 10px;">
+    <!-- Image container: centered; clip-path animates to close it on exit -->
+    <div
+        id="preloader-img-container"
+        style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 104px; height: 130px; z-index: 2;"
+    >
         <img
             id="preloader-img"
             src=""
             alt=""
             class="w-full h-full object-cover"
-            style="opacity: 0;"
         />
-        <div
-            id="preloader-cover"
-            class="absolute inset-0 bg-white"
-            style="transform: translateY(-100%);"
-        ></div>
     </div>
+
+    <!-- Name: SplitText splits into words; each word gets an overflow:hidden wrapper for mask reveal -->
+    <p
+        id="preloader-name"
+        class="font-normal text-md tracking-custom uppercase"
+        style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); white-space: nowrap; line-height: 1; visibility: hidden; z-index: 1;"
+    >Justin Abernethy</p>
 
     <p
         id="preloader-progress"
-        class="absolute font-normal text-md tracking-custom uppercase"
+        class="absolute font-normal text-md tracking-custom uppercase text-center hidden"
         style="bottom: 60px;"
     >
         0%
@@ -41,95 +40,321 @@ const { thumbnails } = Astro.props;
 </div>
 
 <script define:vars={{ thumbnails }}>
-    (function () {
-        var preloader = document.getElementById("preloader");
+(function () {
+    'use strict';
 
+    // Desktop only (md breakpoint = 768px)
+    if (!matchMedia('(min-width: 768px)').matches) {
+        var el = document.getElementById('preloader');
+        if (el) el.remove();
+        return;
+    }
 
+    // Skip preloader for direct project links so the target opens immediately
+    if (location.hash.length > 1) {
+        var el = document.getElementById('preloader');
+        if (el) el.remove();
+        return;
+    }
 
-        var imgEl = document.getElementById("preloader-img");
-        var progressEl = document.getElementById("preloader-progress");
+    // Signal to gallery init() that the preloader is handling the reveal
+    window.__PRELOADER_ACTIVE__ = true;
 
-        if (!preloader || !imgEl || !progressEl || !thumbnails.length) {
-            if (preloader) preloader.remove();
+    // ─── New-preloader timing constants ──────────────────────────────────────
+
+    var STAGE1_DURATION   = 1200;  // ms — total span of image reveal stagger
+    var STAGE1_DECAY      = 0.9;   // geometric stagger decay (< 1 = big gaps first)
+    var COVER_ANIM_S      = 1.2;   // s — each cover pull-up animation
+    var COVER_EASE        = 'power2.out';
+
+    // Navbar starts this many ms after stage 1 kicks off (overlapping)
+    var STAGE2_OFFSET_MS  = 1200;   // ms into stage 1 when navbar begins
+    var STAGE2_STAGGER_S  = 0.12;  // s between each navbar item
+    var STAGE2_ANIM_S     = 0.5;   // s — each navbar item reveal
+    var STAGE2_EASE       = 'power3.out';
+
+    // Names start after navbar finishes
+    var STAGE3_GAP_MS     = 200;    // ms between end of navbar and start of names
+    var STAGE3_STAGGER_S  = 0.12;  // s between each name reveal
+    var STAGE3_ANIM_S     = 0.45;  // s — each name reveal
+    var STAGE3_EASE       = 'power3.out';
+
+    // Navbar item ids in left-to-right order
+    var NAV_IDS = ['nav-logo', 'theme-light', 'theme-dark', 'nav-info'];
+
+    // ─── Gate: both old animation AND gallery layout must finish first ────────
+
+    var galleryLayoutReady = false;
+    var oldAnimDone        = false;
+    var capturedItems      = [];
+
+    function maybeStartNewPreloader() {
+        if (!galleryLayoutReady || !oldAnimDone) return;
+
+        var preloader = document.getElementById('preloader');
+        if (preloader) preloader.remove();
+
+        var stage2TotalMs = (NAV_IDS.length - 1) * STAGE2_STAGGER_S * 1000 + STAGE2_ANIM_S * 1000;
+        var stage3StartMs = STAGE2_OFFSET_MS + stage2TotalMs + STAGE3_GAP_MS;
+
+        runStage1(capturedItems);
+        setTimeout(runStage2, STAGE2_OFFSET_MS);
+        setTimeout(function () { runStage3(capturedItems); }, stage3StartMs);
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    function computeRevealTimes(n, totalMs, decay) {
+        if (n <= 0) return [];
+        if (n === 1) return [0];
+        var S0 = totalMs * (1 - decay) / (1 - Math.pow(decay, n));
+        var times = [];
+        var t = 0;
+        for (var i = 0; i < n; i++) {
+            times.push(t);
+            t += S0 * Math.pow(decay, i);
+        }
+        return times;
+    }
+
+    // ─── Old preloader animation ──────────────────────────────────────────────
+
+    var OLD_ANIM_DURATION = 4000;
+
+    function expoInOut(t) {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+        return t < 0.5
+            ? Math.pow(2, 20 * t - 10) / 2
+            : (2 - Math.pow(2, -20 * t + 10)) / 2;
+    }
+
+    function runOldExitAnimation() {
+        var gsap      = window.gsap;
+        var SplitText = window.SplitText;
+        if (!gsap || !SplitText) {
+            requestAnimationFrame(runOldExitAnimation);
             return;
         }
 
-        var total = thumbnails.length;
-        var ANIM_DURATION = 8000;
+        var nameEl      = document.getElementById('preloader-name');
+        nameEl.style.visibility = 'visible';
+        var containerEl = document.getElementById('preloader-img-container');
+        var progressEl  = document.getElementById('preloader-progress');
+        var preloader   = document.getElementById('preloader');
 
-        function expoInOut(t) {
-            if (t <= 0) return 0;
-            if (t >= 1) return 1;
-            return t < 0.5
-                ? Math.pow(2, 20 * t - 10) / 2
-                : (2 - Math.pow(2, -20 * t + 10)) / 2;
-        }
+        var COVER_DUR = 0.45;
+        var PAUSE     = 0.12;
+        var STAGGER   = 0.07;
+        var IN_DUR    = 0.5;
+        var IN_EASE   = 'power3.out';
+        var HOLD      = 0.6;
+        var OUT_DUR   = 0.5;
+        var OUT_EASE  = 'power3.in';
 
-        function finish() {
-            sessionStorage.setItem("preloader-shown", "1");
-            preloader.style.transition = "opacity 0.5s ease-out";
-            preloader.style.opacity = "0";
-            preloader.addEventListener(
-                "transitionend",
-                function () {
-                    preloader.remove();
-                },
-                { once: true },
-            );
-        }
+        // Split name into words; wrap each in overflow:hidden for mask reveal
+        var split = new SplitText(nameEl, { type: 'words' });
+        split.words.forEach(function (word) {
+            var wrapper = document.createElement('span');
+            wrapper.style.cssText = 'display:inline-block;overflow:hidden;vertical-align:bottom;line-height:1;';
+            word.parentNode.insertBefore(wrapper, word);
+            wrapper.appendChild(word);
+        });
 
-        function runExitAnimation() {
-            var nameEl = document.getElementById("preloader-name");
-            var cover = document.getElementById("preloader-cover");
+        // Words start below their mask — pure yPercent, no opacity
+        gsap.set(split.words, { yPercent: 0 });
 
-            // Name slides below its baseline (mask out, ease-in)
-            nameEl.style.transition =
-                "transform 0.45s cubic-bezier(0.5, 0, 0.75, 0)";
-            nameEl.style.transform = "translateY(100%)";
-
-            // White cover sweeps down over the image (ease-out)
-            cover.style.transition =
-                "transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)";
-            cover.style.transform = "translateY(0%)";
-
-            // Brief pause after animations settle, then fade out
-            setTimeout(function () {
-                finish();
-            }, 700);
-        }
-
-        function runAnimation() {
-            imgEl.style.opacity = "1";
-            var start = performance.now();
-
-            function frame(now) {
-                var elapsed = Math.min(now - start, ANIM_DURATION);
-                var progress = expoInOut(elapsed / ANIM_DURATION);
-
-                progressEl.textContent = Math.round(progress * 100) + "%";
-
-                var idx = Math.min(Math.floor(progress * total), total - 1);
-                imgEl.src = thumbnails[idx];
-
-                if (elapsed < ANIM_DURATION) {
-                    requestAnimationFrame(frame);
-                } else {
-                    runExitAnimation();
-                }
+        var tl = gsap.timeline({
+            onComplete: function () {
+                preloader.style.transition = 'opacity 0.4s ease-out';
+                preloader.style.opacity    = '0';
+                preloader.addEventListener('transitionend', function () {
+                    oldAnimDone = true;
+                    maybeStartNewPreloader();
+                }, { once: true });
             }
+        });
 
-            requestAnimationFrame(frame);
+        // Hide progress counter instantly
+        tl.set(progressEl, { autoAlpha: 0 }, 0);
+
+        // Close image container via clip-path — no opacity change on the image
+        tl.fromTo(containerEl,
+            { clipPath: 'inset(0% 0% 0% 0%)' },
+            { clipPath: 'inset(100% 0% 0% 0%)', duration: COVER_DUR, ease: 'power2.in' },
+            0
+        );
+
+        // Words slide up from below mask, staggered — no opacity
+        var inAt = COVER_DUR + PAUSE;
+        tl.to(split.words, { yPercent: 0, delay: 0.2, duration: IN_DUR, ease: IN_EASE, stagger: STAGGER }, inAt);
+
+        // Words slide back down below mask, staggered — no opacity
+
+        tl.to(split.words, { display: 'none', duration: 0, });
+    }
+
+    function runOldAnimation() {
+        var imgEl      = document.getElementById('preloader-img');
+        var progressEl = document.getElementById('preloader-progress');
+        if (!imgEl || !progressEl) { oldAnimDone = true; maybeStartNewPreloader(); return; }
+
+        var total = thumbnails.length;
+        var start = performance.now();
+
+        function frame(now) {
+            var elapsed  = Math.min(now - start, OLD_ANIM_DURATION);
+            var progress = expoInOut(elapsed / OLD_ANIM_DURATION);
+
+            progressEl.textContent = Math.round(progress * 100) + '%';
+            imgEl.src = thumbnails[Math.min(Math.floor(progress * total), total - 1)];
+
+            if (elapsed < OLD_ANIM_DURATION) {
+                requestAnimationFrame(frame);
+            } else {
+                runOldExitAnimation();
+            }
         }
 
-        // Preload all images in parallel, then animate
-        var loaded = 0;
+        requestAnimationFrame(frame);
+    }
+
+    // Preload all thumbnails then start old animation.
+    // If no thumbnails, skip straight to the gate.
+    if (thumbnails.length === 0) {
+        oldAnimDone = true;
+    } else {
+        var loadedCount = 0;
         thumbnails.forEach(function (url) {
             var img = new window.Image();
             img.onload = img.onerror = function () {
-                loaded++;
-                if (loaded === total) runAnimation();
+                loadedCount++;
+                if (loadedCount === thumbnails.length) runOldAnimation();
             };
             img.src = url;
         });
-    })();
+    }
+
+    // ─── Stage 1: image reveals (gallery covers pull up) ─────────────────────
+
+    function runStage1(allItems) {
+        var groupA = [], groupB = [];
+        for (var i = 0; i < allItems.length; i++) {
+            var gi = parseInt(allItems[i].dataset.globalIndex || '999', 10);
+            (gi < 10 ? groupA : groupB).push(allItems[i]);
+        }
+        groupA.sort(function (a, b) { return parseInt(a.dataset.globalIndex || '0', 10) - parseInt(b.dataset.globalIndex || '0', 10); });
+        groupB.sort(function (a, b) { return parseInt(a.dataset.globalIndex || '0', 10) - parseInt(b.dataset.globalIndex || '0', 10); });
+        var seq = groupA.concat(groupB);
+        var n   = seq.length;
+        if (n === 0) return;
+
+        var times = computeRevealTimes(n, STAGE1_DURATION, STAGE1_DECAY);
+        var gsap  = window.gsap;
+
+        for (var i = 0; i < n; i++) {
+            (function (item, delay) {
+                setTimeout(function () {
+                    var cover = item.__preloaderCover;
+                    if (!cover) return;
+                    gsap.to(cover, {
+                        yPercent: -100,
+                        duration: COVER_ANIM_S,
+                        ease: COVER_EASE,
+                        onComplete: function () {
+                            cover.remove();
+                            delete item.__preloaderCover;
+                        }
+                    });
+                }, delay);
+            })(seq[i], times[i]);
+        }
+    }
+
+    // ─── Stage 2: navbar mask reveal (left → right, one by one) ──────────────
+
+    function runStage2() {
+        var gsap = window.gsap;
+        var tl   = gsap.timeline();
+        for (var i = 0; i < NAV_IDS.length; i++) {
+            var el = document.getElementById(NAV_IDS[i]);
+            if (el) tl.to(el, { yPercent: 0, duration: STAGE2_ANIM_S, ease: STAGE2_EASE }, i * STAGE2_STAGGER_S);
+        }
+    }
+
+    // ─── Stage 3: project name mask reveals (top → bottom, one by one) ────────
+
+    function runStage3(allItems) {
+        var sorted = allItems.slice().sort(function (a, b) {
+            return parseInt(a.dataset.globalIndex || '0', 10) - parseInt(b.dataset.globalIndex || '0', 10);
+        });
+
+        var gsap     = window.gsap;
+        var nameEls  = [];
+        var indexEls = [];
+        for (var i = 0; i < sorted.length; i++) {
+            var nameEl  = sorted[i].querySelector('.project-title h3');
+            var indexEl = sorted[i].querySelector('[data-index-reveal]');
+            if (nameEl)  nameEls.push(nameEl);
+            if (indexEl) indexEls.push(indexEl);
+        }
+
+        gsap.to(nameEls,  { yPercent: 0, duration: STAGE3_ANIM_S, ease: STAGE3_EASE, stagger: STAGE3_STAGGER_S });
+        gsap.to(indexEls, { yPercent: 0, duration: STAGE3_ANIM_S, ease: STAGE3_EASE, stagger: STAGE3_STAGGER_S });
+
+        var totalMs = (sorted.length - 1) * STAGE3_STAGGER_S * 1000 + STAGE3_ANIM_S * 1000;
+        setTimeout(function () {
+            var footer = document.getElementById('desktop-footer');
+            if (footer) {
+                footer.style.visibility = 'visible';
+                footer.style.transition = 'opacity 0.4s ease';
+                footer.style.opacity    = '1';
+            }
+            window.__PRELOADER_ACTIVE__ = false;
+            document.body.style.overflow = '';
+        }, totalMs);
+    }
+
+    // ─── Gallery-layout-ready: set up covers + hide names/nav ────────────────
+
+    window.addEventListener('gallery-layout-ready', function () {
+        capturedItems = Array.from(document.querySelectorAll('.gallery-item'));
+
+        document.body.style.overflow = 'hidden';
+
+        for (var i = 0; i < capturedItems.length; i++) {
+            var cover = document.createElement('div');
+            cover.style.cssText =
+                'position:absolute;inset:0;z-index:15;pointer-events:none;' +
+                'background:var(--bg-primary);';
+            capturedItems[i].appendChild(cover);
+            capturedItems[i].__preloaderCover = cover;
+        }
+
+        var gsap = window.gsap;
+
+        for (var i = 0; i < capturedItems.length; i++) {
+            var nameEl  = capturedItems[i].querySelector('.project-title h3');
+            var indexEl = capturedItems[i].querySelector('[data-index-reveal]');
+            if (nameEl)  gsap.set(nameEl,  { yPercent: -110 });
+            if (indexEl) gsap.set(indexEl, { yPercent: -110 });
+        }
+        for (var i = 0; i < NAV_IDS.length; i++) {
+            var el = document.getElementById(NAV_IDS[i]);
+            if (el) gsap.set(el, { yPercent: -110 });
+        }
+
+        galleryLayoutReady = true;
+        maybeStartNewPreloader();
+    }, { once: true });
+
+    // Safety valve
+    setTimeout(function () {
+        var preloader = document.getElementById('preloader');
+        if (preloader) preloader.remove();
+        window.__PRELOADER_ACTIVE__ = false;
+        document.body.style.overflow = '';
+    }, 15000);
+
+})();
 </script>

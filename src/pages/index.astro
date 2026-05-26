@@ -52,9 +52,20 @@ function getAspect(project: (typeof projects)[number]): number {
   return project.muxID && !project.thumbnail?.asset ? 9 / 16 : 7 / 5;
 }
 
+function nameToSlug(name: string): string {
+  // NFD splits accented chars (e.g. é → e + combining mark); strip the non-ASCII remainder
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[^\x00-\x7F]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 // Pre-compute all image URLs for client-side use
 const projectsWithUrls = projects.map(project => ({
   ...project,
+  slug: project.name ? nameToSlug(project.name) : project._id,
   thumbnailUrl: project.thumbnail?.asset ? `${urlForImage(project.thumbnail).url()}?auto=format` : null,
   galleryUrls: project.imageGallery?.filter((img: any) => img?.asset).map((img: any) => ({
     url: `${urlForImage(img).url()}?auto=format`,
@@ -161,11 +172,15 @@ const extendedProjects =
                       )}
                       <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-normal tracking-custom -mt-0 pb-padding">
                         <div class="absolute z-0 mt-0 h-full flex flex-col gap-0 project-title">
-                          <h3 class="text-sm leading-[100%] tracking-custom whitespace-nowrap">{project.name}</h3>
+                          <div style="overflow: hidden; line-height: 1;">
+                            <h3 class="text-sm leading-[100%] tracking-custom whitespace-nowrap">{project.name}</h3>
+                          </div>
                         </div>
                         <div class="title-fade-overlay absolute inset-0 h-full w-full z-1 pointer-events-none opacity-0 gradient-fade"></div>
                         <div class="flex flex-col gap-0 items-end grow z-2">
-                          <p class="text-sm leading-[100%] tracking-custom flex">{project.index}</p>
+                          <div style="overflow: hidden; line-height: 1;">
+                            <p class="text-sm leading-[100%] tracking-custom flex" data-index-reveal>{project.index}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -179,14 +194,14 @@ const extendedProjects =
 
       <!-- Project Detail Section (hidden initially, in document flow) -->
       <div id="project-detail" class="hidden z-20">
-        <div class="w-full flex pb-padding">
+        <div class="w-full flex">
           <div class="grid grid-cols-10 gap-padding w-full">
             <!-- Left Sidebar -->
             <div class="col-span-2 max-[1100px]:col-span-3 flex flex-col h-full min-h-screen">
-              <div class="sticky top-0 h-screen min-h-200 w-full flex flex-col pb-padding">
+              <div class="sticky top-2 h-screen min-h-200 w-full flex flex-col p-padding">
                 <!-- Preview container: grows into remaining space and centres itself -->
                 <div class="flex-1 flex items-center">
-                <div class="project-preview w-[75%]">
+                <div class="project-preview w-full">
                   <div class="relative w-full" style="aspect-ratio: 4/5">
                     <div class="grid absolute inset-0" id="detail-preview-grid">
                       {projectsWithUrls.map((project) => (
@@ -219,7 +234,7 @@ const extendedProjects =
 
                 <!-- Project list -->
                 <div id="project-list-container" class="project-list-container">
-                  <div class="project-list flex flex-col justify-end gap-0 text-sm uppercase tracking-custom leading-[115%] font-normal">
+                  <div class="project-list flex flex-col justify-end gap-0 text-sm uppercase tracking-custom leading-[115%] font-normal pb-2">
                     {projectsWithUrls.map((project) => (
                       <div
                         class="detail-list-item flex flex-row gap-padding cursor-pointer opacity-muted"
@@ -251,8 +266,8 @@ const extendedProjects =
         </div>
       </div>
 
-      <div id="single-view-overlay" class="fixed inset-0 z-[10000] bg-theme hidden opacity-0 pointer-events-none transition-opacity duration-300">
-        <div class="h-screen w-full grid! grid-cols-20 gap-padding bg-theme text-theme text-sm tracking-custom uppercase relative px-padding">
+      <div id="single-view-overlay" class="fixed inset-0 z-[10000] bg-black hidden opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="h-screen w-full grid! grid-cols-20 gap-padding bg-black text-white text-sm tracking-custom uppercase relative px-padding">
 
           <!-- Left Controls (initially hidden) -->
           <div class="col-span-3 h-full w-full flex flex-row items-center justify-between pr-padding">
@@ -293,7 +308,7 @@ const extendedProjects =
           <span class="inline-flex gap-1 tabular-nums">
             <span data-mux-ctl="current">00:00</span><span>/</span><span data-mux-ctl="duration">00:00</span>
           </span>
-           <span data-mux-ctl="fullscreen" class="cursor-pointer hover:opacity-70 hidden md:inline">FULLSCREEN</span>
+           <span data-mux-ctl="fullscreen" class="cursor-pointer hover:opacity-70 hidden md:inline pointer-events-auto">FULLSCREEN</span>
         </div>
       </div>
     </section>
@@ -477,6 +492,12 @@ const extendedProjects =
 
 <script>
   import gsap from 'gsap';
+  import { SplitText } from 'gsap/SplitText';
+  gsap.registerPlugin(SplitText);
+
+  // Expose globals so the inline preloader script can use them
+  (window as any).gsap = gsap;
+  (window as any).SplitText = SplitText;
 
   // Each script gates init on initial breakpoint and never re-runs the other
   // path — reload on crossover so the matching gallery initialises cleanly.
@@ -490,6 +511,7 @@ const extendedProjects =
 
   // ─── Constants ─────────────────────────────────────────────────────────────
   const FALLOFF = 0.8;
+  const MAGNIFICATION = 1.2; // target width ratio for the directly-hovered item vs its equal share
   const ITEM_GAP_PX = 8;
   const DURATION = 0.5;
   const DURATION_ALT = 0.5;
@@ -645,10 +667,10 @@ const extendedProjects =
 
     // Build first slot
     const firstSlot = document.createElement('div');
-    firstSlot.className = 'col-span-1 w-full overflow-visible';
     firstSlot.id = 'detail-first-image';
 
     if (project.muxID && !project.thumbnailUrl) {
+      firstSlot.className = 'col-span-2 w-full overflow-visible';
       firstSlot.innerHTML = `
         <mux-player
           playback-id="${project.muxID}"
@@ -660,6 +682,7 @@ const extendedProjects =
         ></mux-player>
       `;
     } else if (project.thumbnailUrl) {
+      firstSlot.className = 'col-span-1 w-full overflow-visible';
       firstSlot.innerHTML = `
         <img
           src="${project.thumbnailUrl}"
@@ -713,6 +736,7 @@ const extendedProjects =
     isAnimating = true;
     currentProjectId = projectId;
     clickedRowIndex = itemRowCache.get(clickedItem) ?? 0;
+    if (project.slug) history.replaceState(null, '', '#' + project.slug);
 
     // Populate project detail (but keep it hidden for now)
     populateProjectDetail(project);
@@ -812,7 +836,7 @@ const extendedProjects =
     tl.to(covers, {
       y: 0,
       duration: 1,
-      ease: 'power3.out',
+      ease: 'power2.out',
       overwrite: 'auto',
       stagger: {
         each: 0.4 / Math.max(covers.length - 1, 1),
@@ -929,6 +953,7 @@ const extendedProjects =
     isProjectOpen = false;
     isAnimating = false;
     currentProjectId = null;
+    history.replaceState(null, '', location.pathname + location.search);
 
     cleanupScrollObserver();
 
@@ -996,7 +1021,15 @@ const extendedProjects =
     if (lenis) {
       requestAnimationFrame(() => {
         lenis.start();
+        lenis.scrollTo(window.scrollY, { immediate: true });
       });
+    }
+
+    // Reveal footer in case it was hidden on a deep-link load
+    const footer = document.getElementById('desktop-footer');
+    if (footer) {
+      footer.style.visibility = 'visible';
+      gsap.to(footer, { opacity: 1, duration: 0.4, ease: 'power2.out', overwrite: true });
     }
   }
 
@@ -1007,6 +1040,7 @@ const extendedProjects =
     if (!project) return;
 
     currentProjectId = newProjectId;
+    if (project.slug) history.replaceState(null, '', '#' + project.slug);
 
     gsap.to(detailImageGallery!.children, {
       opacity: 0,
@@ -1026,6 +1060,69 @@ const extendedProjects =
         );
       }
     });
+  }
+
+  // ─── Deep Link ─────────────────────────────────────────────────────────────
+
+  function openProjectInstant(projectId: string) {
+    const project = getProjectById(projectId);
+    if (!project) return;
+
+    isProjectOpen = true;
+    isAnimating = false;
+    currentProjectId = projectId;
+    clickedRowIndex = 0;
+    activeRowIndex = -1;
+    if (project.slug) history.replaceState(null, '', '#' + project.slug);
+
+    populateProjectDetail(project);
+
+    // Remove gallery image covers immediately (no reveal animation)
+    detailImageGallery!.querySelectorAll<HTMLElement>('.gallery-image-cover').forEach(c => c.remove());
+
+    // Compute savedMaxDelta so closeProject can restore the gallery correctly
+    const deltas = cachedMaxDeltas.filter(d => isFinite(d) && !isNaN(d));
+    savedMaxDelta = deltas.length > 0 ? Math.max(...deltas) : 0;
+
+    // Reset gallery item and wrapper state
+    for (const wrapper of allWrappers) setWrapperYInstant(wrapper, 0);
+    for (const item of allItems) {
+      const cover = item.querySelector<HTMLElement>('.gallery-item-cover');
+      if (cover) gsap.set(cover, { y: '100%' });
+      item.style.visibility = '';
+      item.style.pointerEvents = '';
+      const media = item.querySelector<HTMLElement>('.item-media');
+      if (media) media.style.visibility = '';
+      const caption = item.querySelector<HTMLElement>('.item-name-type');
+      if (caption) caption.style.visibility = '';
+    }
+
+    // Position gallery container below the project detail (out of initial viewport)
+    gsap.set(container, { y: 0, marginTop: window.innerHeight * 1.2, opacity: 1 });
+
+    // Insert detail before gallery and reveal it
+    container.parentElement?.insertBefore(projectDetail, container);
+    projectDetail.classList.remove('hidden');
+
+    // Show project list immediately (no fade-in)
+    gsap.set(projectListContainer, { opacity: 1 });
+    projectListContainer.style.pointerEvents = 'auto';
+
+    window.scrollTo(0, 0);
+    setupScrollObserver();
+  }
+
+  // Returns true if a deep-link project was found (caller should skip normal gallery reveal)
+  function checkDeepLink(): boolean {
+    const slug = window.location.hash.slice(1);
+    if (!slug) return false;
+    const project = projectsData.find((p: any) => p.slug === slug);
+    if (!project) return false;
+    // Defer one tick so init() finishes setting up layout state first
+    setTimeout(() => {
+      if (!isProjectOpen && !isAnimating) openProjectInstant(project._id);
+    }, 50);
+    return true;
   }
 
   // ─── Scroll Observer ───────────────────────────────────────────────────────
@@ -1068,8 +1165,13 @@ const extendedProjects =
       const fillEnd    = window.innerHeight * -0.1; // complete when it's 10% above the top edge
       const progress   = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
 
+      // Phase 1 ends / Phase 2 begins at this progress value
+      const REVEAL_START = 0.7;
+
       if (scrollFill) {
-        scrollFill.style.clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`;
+        // Fill completes exactly when the cover starts sliding (REVEAL_START)
+        const fillProgress = Math.min(1, progress / REVEAL_START);
+        scrollFill.style.clipPath = `inset(0 ${(1 - fillProgress) * 100}% 0 0)`;
       }
 
       if (hintEl) {
@@ -1077,7 +1179,6 @@ const extendedProjects =
         hintEl.style.opacity = String(Math.min(1, progress * 8));
 
         // Phase 2 (last 30%): slide hint upward so gallery rows peek in from below
-        const REVEAL_START = 0.7;
         if (progress > REVEAL_START) {
           const t = (progress - REVEAL_START) / (1 - REVEAL_START);
           hintEl.style.transform = `translateY(${-t * 100}%)`;
@@ -1258,16 +1359,22 @@ const extendedProjects =
     for (let i = 0; i < allRows.length; i++) {
       if (isProjectOpen && i < firstVisibleIndex) continue;
 
-      const row = allRows[i];
-      const rect = row.getBoundingClientRect();
+      // Use the wrapper's static position (animated y removed) so that wrapper
+      // y-animation pushing rows upward cannot cause the cursor to appear
+      // "outside" the row and trigger a spurious resetAll().
+      const wrp = allWrappers[i];
+      const wrapperY = getWrapperY(wrp);
+      const wrpRect = wrp.getBoundingClientRect();
+      const staticTop    = wrpRect.top    - wrapperY;
+      const staticBottom = wrpRect.bottom - wrapperY;
 
-      if (clientY >= rect.top && clientY <= rect.bottom) {
+      if (clientY >= staticTop && clientY <= staticBottom) {
         hoveredIndex = i;
       }
 
       let dist = 0;
-      if (clientY < rect.top) dist = rect.top - clientY;
-      else if (clientY > rect.bottom) dist = clientY - rect.bottom;
+      if (clientY < staticTop)    dist = staticTop    - clientY;
+      else if (clientY > staticBottom) dist = clientY - staticBottom;
 
       if (dist < minDistance) {
         minDistance = dist;
@@ -1342,8 +1449,28 @@ const extendedProjects =
 
     // Fill weights buffer in place (no allocation)
     weightsBuffer.length = n;
+    let rawSum = 0;
+    let peak = 0;
     for (let j = 0; j < n; j++) {
       weightsBuffer[j] = Math.pow(FALLOFF, Math.abs(cursorPos - (j + 0.5)));
+      rawSum += weightsBuffer[j];
+      if (weightsBuffer[j] > peak) peak = weightsBuffer[j];
+    }
+    // Rescale non-peak weights so the hovered item reaches MAGNIFICATION × its equal share.
+    // When scale > 1 (edge items in larger rows), cap it so no non-peak item can exceed
+    // the peak — otherwise the adjacent item would become wider than the hovered one.
+    if (n > 1 && rawSum > peak) {
+      let nonPeakScale = (peak * (n / MAGNIFICATION - 1)) / (rawSum - peak);
+      if (nonPeakScale > 1) {
+        let maxNonPeak = 0;
+        for (let j = 0; j < n; j++) {
+          if (weightsBuffer[j] < peak && weightsBuffer[j] > maxNonPeak) maxNonPeak = weightsBuffer[j];
+        }
+        if (maxNonPeak > 0) nonPeakScale = Math.min(nonPeakScale, peak/ maxNonPeak);
+      }
+      for (let j = 0; j < n; j++) {
+        if (weightsBuffer[j] < peak) weightsBuffer[j] *= nonPeakScale;
+      }
     }
 
     const nextRowIndex = targetRowIndex + 1;
@@ -1442,11 +1569,27 @@ const extendedProjects =
     const tmpWeights: number[] = new Array(n);
 
     for (const cursorPos of samplePositions) {
-      let sum = 0;
+      let rawSum = 0;
+      let peak = 0;
       for (let j = 0; j < n; j++) {
         tmpWeights[j] = Math.pow(FALLOFF, Math.abs(cursorPos - (j + 0.5)));
-        sum += tmpWeights[j];
+        rawSum += tmpWeights[j];
+        if (tmpWeights[j] > peak) peak = tmpWeights[j];
       }
+      if (n > 1 && rawSum > peak) {
+        let nonPeakScale = (peak * (n / MAGNIFICATION - 1)) / (rawSum - peak);
+        if (nonPeakScale > 1) {
+          let maxNonPeak = 0;
+          for (let j = 0; j < n; j++) {
+            if (tmpWeights[j] < peak && tmpWeights[j] > maxNonPeak) maxNonPeak = tmpWeights[j];
+          }
+          if (maxNonPeak > 0) nonPeakScale = Math.min(nonPeakScale, peak / maxNonPeak);
+        }
+        for (let j = 0; j < n; j++) {
+          if (tmpWeights[j] < peak) tmpWeights[j] *= nonPeakScale;
+        }
+      }
+      const sum = tmpWeights.reduce((s, w) => s + w, 0);
       let maxNewH = 0;
       for (let j = 0; j < n; j++) {
         const v = ((available * tmpWeights[j]) / sum) * aspects[j];
@@ -1676,9 +1819,11 @@ const extendedProjects =
     else activeMuxPlayer.pause?.();
   });
   muxFullscreenEl?.addEventListener('click', () => {
-    if (!activeMuxPlayer) return;
-    if (document.fullscreenElement) document.exitFullscreen();
-    else activeMuxPlayer.requestFullscreen?.().catch(() => {});
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      activeMuxPlayer?.requestFullscreen?.().catch(() => {});
+    }
   });
   muxMuteEl?.addEventListener('click', () => {
     if (!activeMuxPlayer) return;
@@ -2000,12 +2145,21 @@ const extendedProjects =
       // Reveal once layout is finalised. Inline visibility/opacity prevent
       // the pre-init "stack of overlapping rows" flash on navigation in.
       container.style.visibility = 'visible';
-      gsap.to(container, { opacity: 1, duration: 0.4, ease: 'power2.out' });
 
-      const footer = document.getElementById('desktop-footer');
-      if (footer) {
-        footer.style.visibility = 'visible';
-        gsap.to(footer, { opacity: 1, duration: 0.4, ease: 'power2.out' });
+      if ((window as any).__PRELOADER_ACTIVE__) {
+        // Preloader owns the staged reveal — expose images behind its covers
+        container.style.opacity = '1';
+        window.dispatchEvent(new CustomEvent('gallery-layout-ready'));
+      } else {
+        const isDeepLink = checkDeepLink();
+        if (!isDeepLink) {
+          gsap.to(container, { opacity: 1, duration: 0.4, ease: 'power2.out' });
+          const footer = document.getElementById('desktop-footer');
+          if (footer) {
+            footer.style.visibility = 'visible';
+            gsap.to(footer, { opacity: 1, duration: 0.4, ease: 'power2.out' });
+          }
+        }
       }
 
       // Hover-driven video play/pause
@@ -2311,6 +2465,19 @@ const extendedProjects =
     });
   }
   init();
+
+  // Open project if URL hash matches one on load
+  const mobileDeepSlug = window.location.hash.slice(1);
+  if (mobileDeepSlug) {
+    const mobileDeepProject = projects.find((p: any) => p.slug === mobileDeepSlug);
+    if (mobileDeepProject && mobileDeepProject._id !== '__info__') {
+      const realIdx = projects.indexOf(mobileDeepProject);
+      if (realIdx >= 0) {
+        goToVirtual(realIdx + 1, false);
+        requestAnimationFrame(() => openMobileOverlay(realIdx));
+      }
+    }
+  }
 
   // Programmatic play (Mux recommends `.play()` over the `autoplay` attribute
   // so we can observe failure via the returned Promise).
@@ -2618,6 +2785,7 @@ const extendedProjects =
 
     overlayNameEl.textContent  = project.name ?? '';
     overlayIndexEl.textContent = String(project.index ?? '').padStart(3, '0');
+    if (project.slug) history.replaceState(null, '', '#' + project.slug);
 
     overlayEl.classList.remove('hidden');
     void overlayEl.offsetHeight;
@@ -2640,6 +2808,7 @@ const extendedProjects =
   function closeMobileOverlay(): void {
     if (!overlayOpen) return;
     overlayOpen = false;
+    history.replaceState(null, '', location.pathname + location.search);
     detachMuxControls();
 
     gsap.to(overlayEl, {

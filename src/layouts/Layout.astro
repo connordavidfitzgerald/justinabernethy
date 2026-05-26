@@ -25,10 +25,8 @@ const FONTS: CssVariable[] = ["--font-sans"];
         <meta name="description" content={description} />
         {FONTS.map((font) => <Font cssVariable={font} preload />)}
         <title>{title}</title>
-
     </head>
     <script is:inline>
-        // Blocking script to set theme before paint (prevents flash)
         (function() {
             const savedTheme = localStorage.getItem('theme') || 'light';
             if (savedTheme === 'dark') {
@@ -40,23 +38,105 @@ const FONTS: CssVariable[] = ["--font-sans"];
         <div
             class="fixed top-0 left-0 right-0 h-fit flex flex-row justify-between font-normal text-md px-padding z-10001 pt-padding pb-padding tracking-custom text-white mix-blend-difference"
         >
-            <a href="/" class="pl-1 pt-0.5">Justin Abernethy</a>
+            <div style="overflow: hidden;">
+                <a id="nav-logo" href="/" class="block pl-1 pt-0.5">Justin Abernethy</a>
+            </div>
             <div class="flex flex-row gap-20 justify-end pr-1 pt-0.5">
                 <div class="flex flex-row gap-padding text-md tracking-[-1%] justify-end">
-                    <h3 id="theme-light" class="cursor-pointer opacity-muted dark:opacity-100">LIGHT</h3>
-                    <h3 id="theme-dark" class="cursor-pointer opacity-100 dark:opacity-muted">DARK</h3>
+                    <div style="overflow: hidden;">
+                        <h3 id="theme-light" class="cursor-pointer opacity-muted dark:opacity-100">LIGHT</h3>
+                    </div>
+                    <div style="overflow: hidden;">
+                        <h3 id="theme-dark" class="cursor-pointer opacity-100 dark:opacity-muted">DARK</h3>
+                    </div>
                 </div>
-                <a href="/information" class="">Information</a>
+                <div style="overflow: hidden; position: relative;">
+                    <a id="nav-info" href="/information" class="block">
+                        <span id="nav-info-label" style="display: block;">Information</span>
+                    </a>
+                    <span id="nav-info-close" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap;">Close</span>
+                </div>
             </div>
-
         </div>
-        <slot />
 
+        <!-- Info overlay: wipes down from above, z-index below nav (10001) -->
+        <div
+            id="info-overlay"
+            style="position: fixed; inset: 0; z-index: 10000; pointer-events: none;"
+        >
+            <div
+                id="info-panel"
+                class="bg-theme text-theme absolute inset-0"
+                style="clip-path: inset(0% 0% 100% 0%);"
+            >
+                <!-- Desktop layout -->
+                <div
+                    class="hidden md:grid grid-cols-10 gap-gutter px-padding h-full font-normal text-md tracking-custom uppercase leading-[110%]"
+                    style="padding-top: calc(var(--spacing-padding) * 2 + 1em);"
+                >
+                    <!-- Left column: text content -->
+                    <div class="min-[1100px]:col-span-5 col-span-4 h-full flex flex-col justify-center">
+                        <div class="flex flex-col gap-padding w-full h-fit min-[1100px]:grid min-[1100px]:grid-cols-5 min-[1100px]:gap-gutter">
+                            <div class="min-[1100px]:col-span-3 flex flex-col gap-padding items-start">
+                                <div style="overflow: hidden; line-height: 1.1;">
+                                    <p id="info-reveal-bio" class="text-nowrap" style="display: block;">
+                                        Director and Photographer<br />Based in Toronto.
+                                    </p>
+                                </div>
+                                <div style="overflow: hidden; line-height: 1;">
+                                    <a
+                                        id="info-reveal-email"
+                                        href="mailto:info@justinabernethy.com"
+                                        class="block opacity-muted text-nowrap cursor-pointer"
+                                        style="display: block;"
+                                    >info@justinabernethy.com</a>
+                                </div>
+                            </div>
+                            <div class="min-[1100px]:pt-0 pt-10 flex flex-row gap-10 min-[1100px]:gap-padding min-[1100px]:contents">
+                                <div style="overflow: hidden; line-height: 1;">
+                                    <span
+                                        id="info-reveal-instagram"
+                                        class="block cursor-pointer hover:opacity-muted min-[1100px]:col-span-1 min-[1100px]:flex min-[1100px]:justify-end"
+                                        style="display: block;"
+                                    >Instagram</span>
+                                </div>
+                                <div style="overflow: hidden; line-height: 1;">
+                                    <span
+                                        id="info-reveal-vimeo"
+                                        class="block cursor-pointer hover:opacity-muted min-[1100px]:col-span-1 min-[1100px]:flex min-[1100px]:justify-end min-[1100px]:pr-4"
+                                        style="display: block;"
+                                    >Vimeo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right column: headshot with reveal cover -->
+                    <div class="min-[1100px]:col-span-5 col-span-6 flex flex-row justify-end items-end h-full">
+                        <div class="w-full h-screen px-padding py-3" style="position: relative; overflow: hidden;">
+                            <Picture
+                                src={headshot}
+                                alt="Justin Abernethy headshot"
+                                class="aspect-5/7 w-full h-full object-cover min-w-165"
+                            />
+                            <div
+                                id="info-headshot-cover"
+                                style="position: absolute; inset: 0; background: var(--bg-primary); z-index: 5;"
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <slot />
 
         <script>
             import Lenis from 'lenis';
+            import gsap from 'gsap';
 
-            // Initialize Lenis smooth scroll
+            (window as any).gsap = gsap;
+
             const lenis = new Lenis({
                 duration: 0.8,
                 easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -64,25 +144,18 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 smoothWheel: true,
             });
 
-            // Animation frame loop for Lenis
             function raf(time: number) {
                 lenis.raf(time);
                 requestAnimationFrame(raf);
             }
             requestAnimationFrame(raf);
 
-            // Expose lenis globally for other scripts to access if needed
             (window as any).lenis = lenis;
 
-            // Theme toggle functionality
             const root = document.documentElement;
             const lightBtn = document.getElementById('theme-light');
             const darkBtn = document.getElementById('theme-dark');
 
-            // Theme is already set by blocking script in <head>
-            // This just ensures the state is correct (no-op on initial load)
-
-            // Update button states
             function updateButtonStates() {
                 const isDark = root.classList.contains('dark');
                 if (lightBtn && darkBtn) {
@@ -92,7 +165,6 @@ const FONTS: CssVariable[] = ["--font-sans"];
             }
             updateButtonStates();
 
-            // Toggle handlers
             lightBtn?.addEventListener('click', () => {
                 root.classList.remove('dark');
                 localStorage.setItem('theme', 'light');
@@ -105,6 +177,105 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 localStorage.setItem('theme', 'dark');
                 updateButtonStates();
                 window.dispatchEvent(new CustomEvent('themechange', { detail: 'dark' }));
+            });
+
+            // ─── Info overlay ─────────────────────────────────────────────────────
+
+            const overlay      = document.getElementById('info-overlay')!;
+            const panel        = document.getElementById('info-panel')!;
+            const navInfo      = document.getElementById('nav-info')!;
+            const navInfoLabel = document.getElementById('nav-info-label')!;
+            const navInfoClose = document.getElementById('nav-info-close')!;
+            const revealEls    = (
+                ['info-reveal-bio', 'info-reveal-email', 'info-reveal-instagram', 'info-reveal-vimeo']
+                    .map(id => document.getElementById(id))
+                    .filter(Boolean)
+            ) as HTMLElement[];
+            const headshotCover = document.getElementById('info-headshot-cover') as HTMLElement | null;
+
+            let overlayOpen = false;
+            let labelTl: gsap.core.Timeline | null = null;
+
+            // Initial states
+            gsap.set(panel,         { clipPath: 'inset(0% 0% 100% 0%)' });
+            gsap.set(revealEls,     { clipPath: 'inset(0% 0% 100% 0%)' });
+            gsap.set(headshotCover, { clipPath: 'inset(0% 0% 0% 0%)' });
+            gsap.set(navInfoClose,  { yPercent: 110 });
+
+            function swapLabel(toClose: boolean) {
+                if (labelTl) labelTl.kill();
+                labelTl = gsap.timeline();
+                if (toClose) {
+                    labelTl
+                        .to(navInfoLabel, { yPercent: 110, duration: 0.22, ease: 'power3.in' })
+                        .to(navInfoClose, { yPercent: 0,   duration: 0.22, ease: 'power3.out' }, '-=0.05');
+                } else {
+                    labelTl
+                        .to(navInfoClose, { yPercent: 110, duration: 0.22, ease: 'power3.in' })
+                        .to(navInfoLabel, { yPercent: 0,   duration: 0.22, ease: 'power3.out' }, '-=0.05');
+                }
+            }
+
+            function openInfo() {
+                if (overlayOpen) return;
+                overlayOpen = true;
+                overlay.style.pointerEvents = 'auto';
+                document.body.style.overflow = 'hidden';
+                swapLabel(true);
+
+                // Background appears instantly
+                gsap.set(panel, { clipPath: 'inset(0% 0% 0% 0%)' });
+
+                // Text elements: staggered clip-path reveal top → bottom
+                gsap.to(revealEls, {
+                    clipPath: 'inset(0% 0% 0% 0%)',
+                    duration: 0.6,
+                    ease: 'power3.out',
+                    stagger: 0.08,
+                });
+
+                // Headshot: clip the cover away from top so the image is revealed top → bottom
+                gsap.to(headshotCover, {
+                    clipPath: 'inset(100% 0% 0% 0%)',
+                    duration: 1.0,
+                    ease: 'power2.out',
+                    delay: 0.15,
+                });
+            }
+
+            function closeInfo() {
+                if (!overlayOpen) return;
+                overlayOpen = false;
+                document.body.style.overflow = '';
+                swapLabel(false);
+
+                const tl = gsap.timeline({
+                    onComplete: () => {
+                        // Reset to initial state; panel hides instantly after elements are gone
+                        gsap.set(panel,         { clipPath: 'inset(0% 0% 100% 0%)', });
+                        gsap.set(revealEls,     { clipPath: 'inset(0% 0% 100% 0%)' });
+                        gsap.set(headshotCover, { clipPath: 'inset(0% 0% 0% 0%)' });
+                        overlay.style.pointerEvents = 'none';
+
+                    }
+                });}
+
+
+            navInfo.addEventListener('click', (e: MouseEvent) => {
+                if (window.innerWidth >= 768) {
+                    e.preventDefault();
+                    if (overlayOpen) closeInfo();
+                    else openInfo();
+                }
+                // mobile: falls through to normal /information navigation
+            });
+
+            navInfoClose.addEventListener('click', () => {
+                if (window.innerWidth >= 768) closeInfo();
+            });
+
+            document.addEventListener('keydown', (e: KeyboardEvent) => {
+                if (e.key === 'Escape' && overlayOpen) closeInfo();
             });
         </script>
     </body>
