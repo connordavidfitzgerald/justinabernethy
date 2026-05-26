@@ -59,8 +59,8 @@ const FONTS: CssVariable[] = ["--font-sans"];
                     <a id="nav-info" href="/information" class="block">
                         <span id="nav-info-label" style="display: block;">Information</span>
                     </a>
-                    <span id="nav-info-close" class="cursor-pointer" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap;">Close</span>
-                    <span id="nav-info-scroll-top" class="cursor-pointer" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap;">Back to top</span>
+                    <span id="nav-info-close" class="cursor-pointer" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap; visibility: hidden;">Close</span>
+                    <span id="nav-info-scroll-top" class="cursor-pointer" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap; visibility: hidden;">Back to top</span>
                 </div>
             </div>
         </div>
@@ -215,6 +215,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 ];
                 for (const { el, active } of targets) {
                     if (active) {
+                        el.style.visibility = 'visible';
                         labelTl.to(el, { yPercent: 0,   duration: 0.22, ease: 'power3.out' }, '-=0.05');
                     } else {
                         labelTl.to(el, { yPercent: 110, duration: 0.22, ease: 'power3.in'  }, 0);
