@@ -20,13 +20,14 @@ const { thumbnails } = Astro.props;
             src=""
             alt=""
             class="w-full h-full object-cover"
+            style="visibility: hidden;"
         />
     </div>
 
     <!-- Name: SplitText splits into words; each word gets an overflow:hidden wrapper for mask reveal -->
     <p
         id="preloader-name"
-        class="font-normal text-md tracking-custom uppercase"
+        class="font-normal text-md tracking-custom uppercase "
         style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); white-space: nowrap; line-height: 1; visibility: hidden; z-index: 1;"
     >Justin Abernethy</p>
 
@@ -208,6 +209,7 @@ const { thumbnails } = Astro.props;
 
             progressEl.textContent = Math.round(progress * 100) + '%';
             imgEl.src = thumbnails[Math.min(Math.floor(progress * total), total - 1)];
+            imgEl.style.visibility = 'visible';
 
             if (elapsed < OLD_ANIM_DURATION) {
                 requestAnimationFrame(frame);

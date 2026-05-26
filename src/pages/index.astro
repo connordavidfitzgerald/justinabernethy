@@ -66,18 +66,24 @@ function nameToSlug(name: string): string {
 const projectsWithUrls = projects.map(project => ({
   ...project,
   slug: project.name ? nameToSlug(project.name) : project._id,
-  thumbnailUrl: project.thumbnail?.asset ? `${urlForImage(project.thumbnail).url()}?auto=format` : null,
+  // 900px covers gallery grid, sidebar preview, mobile (2× retina ~430px → 860px)
+  thumbnailUrl: project.thumbnail?.asset
+    ? urlForImage(project.thumbnail).width(900).quality(100).auto('format').url()
+    : null,
+  // 1400px covers fullscreen overlay (portrait ~700px, landscape up to ~1400px)
   galleryUrls: project.imageGallery?.filter((img: any) => img?.asset).map((img: any) => ({
-    url: `${urlForImage(img).url()}?auto=format`,
+    url: urlForImage(img).width(1400).quality(100).auto('format').url(),
     _key: img._key
   })) || []
 }));
 
-// Thumbnails sorted ascending by index for the preloader
+// Thumbnails sorted ascending by index for the preloader.
+// Use small images (300px wide, q=60) — the preloader image is only 104×130px
+// so there's no reason to fetch full-resolution Sanity assets here.
 const preloaderThumbnails = projectsWithUrls
     .slice()
     .sort((a: any, b: any) => a.index - b.index)
-    .map((p: any) => p.thumbnailUrl)
+    .map((p: any) => p.thumbnailUrl ? `${p.thumbnailUrl}&w=300&q=60` : null)
     .filter(Boolean) as string[];
 
 // Info slide (project 00) for mobile slider
@@ -163,7 +169,7 @@ const extendedProjects =
                         />
                       ) : (
                         <img
-                          src={`${urlForImage(project.thumbnail).url()}?auto=format`}
+                          src={urlForImage(project.thumbnail).width(900).quality(100).auto('format').url()}
                           alt={project.name}
                           class="item-media w-full object-cover"
                           style="aspect-ratio: 5/7"
@@ -176,7 +182,7 @@ const extendedProjects =
                             <h3 class="text-sm leading-[100%] tracking-custom whitespace-nowrap">{project.name}</h3>
                           </div>
                         </div>
-                        <div class="title-fade-overlay absolute inset-0 h-full w-full z-1 pointer-events-none opacity-0 gradient-fade"></div>
+                        <div class="title-fade-overlay absolute inset-0 h-full w-full z-1 pointer-events-none opacity-100 gradient-fade"></div>
                         <div class="flex flex-col gap-0 items-end grow z-2">
                           <div style="overflow: hidden; line-height: 1;">
                             <p class="text-sm leading-[100%] tracking-custom flex" data-index-reveal>{project.index}</p>
@@ -194,13 +200,13 @@ const extendedProjects =
 
       <!-- Project Detail Section (hidden initially, in document flow) -->
       <div id="project-detail" class="hidden z-20">
-        <div class="w-full flex">
+        <div class="w-full flex px-0.5">
           <div class="grid grid-cols-10 gap-padding w-full">
             <!-- Left Sidebar -->
             <div class="col-span-2 max-[1100px]:col-span-3 flex flex-col h-full min-h-screen">
-              <div class="sticky top-2 h-screen min-h-200 w-full flex flex-col p-padding">
+              <div class="sticky top-2 h-screen min-h-200 w-full flex flex-col ">
                 <!-- Preview container: grows into remaining space and centres itself -->
-                <div class="flex-1 flex items-center">
+                <div class="flex-1 flex items-end pb-padding">
                 <div class="project-preview w-full">
                   <div class="relative w-full" style="aspect-ratio: 4/5">
                     <div class="grid absolute inset-0" id="detail-preview-grid">
@@ -525,7 +531,7 @@ const extendedProjects =
   const MOVE_DURATION = 0.8;
   const MOVE_DELAY = 0.6;
 
-  const VERTICAL_THRESHOLD = 0.9;
+  const VERTICAL_THRESHOLD = 0.95;
   const INTENSITY_MULTIPLIER = 0.8;
   const CURVE_POWER = 1.2;
 
@@ -597,6 +603,12 @@ const extendedProjects =
 
   // Per-row max-delta cache (only changes on resize)
   let cachedMaxDeltas: number[] = [];
+
+  // Document-relative natural top of each wrapper, captured in init() after the
+  // container y-offset is applied and all wrapper y-animations are 0.
+  // Using document coords + subtracting scrollY at query time gives a stable
+  // detection boundary that never drifts due to mid-animation getBoundingClientRect.
+  let wrapperNaturalTops: number[] = [];
 
   // Pre-build per-row / per-item caches and quickTo setters
   allRows.forEach((row, i) => {
@@ -1161,12 +1173,13 @@ const extendedProjects =
       }
       const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
       const hintEl     = document.getElementById('scroll-back-hint') as HTMLElement | null;
-      const fillStart  = window.innerHeight * 1.25;        // begin once the gallery row enters the viewport
+      const fillStart  = window.innerHeight * 1.5;         // begin once the gallery row enters the viewport
       const fillEnd    = window.innerHeight * -0.1; // complete when it's 10% above the top edge
       const progress   = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
 
       // Phase 1 ends / Phase 2 begins at this progress value
-      const REVEAL_START = 0.7;
+      // At REVEAL_START, wrapperRect.top ≈ vh so gallery emerges right under the cover's bottom edge
+      const REVEAL_START = 0.3;
 
       if (scrollFill) {
         // Fill completes exactly when the cover starts sliding (REVEAL_START)
@@ -1178,10 +1191,10 @@ const extendedProjects =
         // Fade in quickly as we enter the zone
         hintEl.style.opacity = String(Math.min(1, progress * 8));
 
-        // Phase 2 (last 30%): slide hint upward so gallery rows peek in from below
-        if (progress > REVEAL_START) {
-          const t = (progress - REVEAL_START) / (1 - REVEAL_START);
-          hintEl.style.transform = `translateY(${-t * 100}%)`;
+        // Slide hint so its bottom edge tracks the gallery top exactly — no gap, no overlap
+        if (wrapperRect.top < window.innerHeight) {
+          const slidePercent = ((1 - wrapperRect.top / window.innerHeight)+2)* 100;
+          hintEl.style.transform = `translateY(-${slidePercent}%)`;
         } else {
           hintEl.style.transform = 'translateY(0)';
         }
@@ -1345,7 +1358,7 @@ const extendedProjects =
         const visibleTop = firstVisibleWrapper.getBoundingClientRect().top;
         const visibleBottom = allWrappers[allWrappers.length - 1].getBoundingClientRect().bottom;
 
-        if (clientY < visibleTop - 40 || clientY > visibleBottom + 40) {
+        if (clientY < visibleTop + 20 || clientY > visibleBottom - 20) {
           resetAll();
           return;
         }
@@ -1356,25 +1369,27 @@ const extendedProjects =
     let minDistance = Infinity;
     let closestIndex = -1;
 
+    // Use pre-snapshotted document-relative natural positions (captured in init when
+    // all wrapper y-animations are 0). Convert to viewport coords via current scrollY.
+    // This is the only reliable approach: rect.top - getWrapperY() drifts mid-animation
+    // because getWrapperY() holds the target y while rect.top reflects the current
+    // interpolated position, making the computed "static" boundary shift during animation.
+    const scrollY = window.scrollY;
+
     for (let i = 0; i < allRows.length; i++) {
       if (isProjectOpen && i < firstVisibleIndex) continue;
+      if (i >= wrapperNaturalTops.length) continue;
 
-      // Use the wrapper's static position (animated y removed) so that wrapper
-      // y-animation pushing rows upward cannot cause the cursor to appear
-      // "outside" the row and trigger a spurious resetAll().
-      const wrp = allWrappers[i];
-      const wrapperY = getWrapperY(wrp);
-      const wrpRect = wrp.getBoundingClientRect();
-      const staticTop    = wrpRect.top    - wrapperY;
-      const staticBottom = wrpRect.bottom - wrapperY;
+      const naturalTop    = wrapperNaturalTops[i] - scrollY;
+      const naturalBottom = naturalTop + allWrappers[i].offsetHeight;
 
-      if (clientY >= staticTop && clientY <= staticBottom) {
+      if (clientY >= naturalTop && clientY <= naturalBottom) {
         hoveredIndex = i;
       }
 
       let dist = 0;
-      if (clientY < staticTop)    dist = staticTop    - clientY;
-      else if (clientY > staticBottom) dist = clientY - staticBottom;
+      if (clientY < naturalTop)         dist = naturalTop    - clientY;
+      else if (clientY > naturalBottom) dist = clientY - naturalBottom;
 
       if (dist < minDistance) {
         minDistance = dist;
@@ -1395,22 +1410,24 @@ const extendedProjects =
     }
 
     const firstWrapper = allWrappers[firstVisibleIndex];
-    const lastWrapper = allWrappers[allWrappers.length - 1];
+    const lastWrapper  = allWrappers[allWrappers.length - 1];
+    const lastIdx      = allWrappers.length - 1;
 
     if (!firstWrapper) {
       resetAll();
       return;
     }
 
-    // Use cached y values instead of gsap.getProperty()
-    const firstWrapperY = getWrapperY(firstWrapper);
-    const lastWrapperY = getWrapperY(lastWrapper);
-    const staticTopBounds = firstWrapper.getBoundingClientRect().top - firstWrapperY;
-    const staticBottomBounds = lastWrapper.getBoundingClientRect().bottom - lastWrapperY;
-    const visualTop = allRows[firstVisibleIndex].getBoundingClientRect().top;
+    const staticTopBounds    = wrapperNaturalTops[firstVisibleIndex] !== undefined
+      ? wrapperNaturalTops[firstVisibleIndex] - scrollY
+      : firstWrapper.getBoundingClientRect().top - getWrapperY(firstWrapper);
+    const staticBottomBounds = wrapperNaturalTops[lastIdx] !== undefined
+      ? wrapperNaturalTops[lastIdx] - scrollY + allWrappers[lastIdx].offsetHeight
+      : lastWrapper.getBoundingClientRect().bottom - getWrapperY(lastWrapper);
+    const visualTop    = allRows[firstVisibleIndex].getBoundingClientRect().top;
     const visualBottom = allRows[allRows.length - 1].getBoundingClientRect().bottom;
 
-    const effectiveTop = Math.min(visualTop, staticTopBounds);
+    const effectiveTop    = Math.min(visualTop, staticTopBounds);
     const effectiveBottom = Math.max(visualBottom, staticBottomBounds);
 
     if (clientY < effectiveTop - 40 || clientY > effectiveBottom + 40) {
@@ -1422,12 +1439,13 @@ const extendedProjects =
     const items = rowItemsCache.get(targetRow) || [];
     const n = items.length;
 
-    const wrapper = allWrappers[targetRowIndex];
-    const currentY = getWrapperY(wrapper);
-    const staticTop = wrapper.getBoundingClientRect().top - currentY;
+    const wrapper    = allWrappers[targetRowIndex];
+    const naturalTop = wrapperNaturalTops[targetRowIndex] !== undefined
+      ? wrapperNaturalTops[targetRowIndex] - scrollY
+      : wrapper.getBoundingClientRect().top - getWrapperY(wrapper);
     const staticHeight = wrapper.offsetHeight;
 
-    let cursorYNorm = (clientY - staticTop) / staticHeight;
+    let cursorYNorm = (clientY - naturalTop) / staticHeight;
     cursorYNorm = Math.max(0, Math.min(1, cursorYNorm));
 
     // Vertical bleed factors
@@ -1457,8 +1475,8 @@ const extendedProjects =
       if (weightsBuffer[j] > peak) peak = weightsBuffer[j];
     }
     // Rescale non-peak weights so the hovered item reaches MAGNIFICATION × its equal share.
-    // When scale > 1 (edge items in larger rows), cap it so no non-peak item can exceed
-    // the peak — otherwise the adjacent item would become wider than the hovered one.
+    // When scale > 1, cap it at FALLOFF × peak / maxNonPeak so the adjacent item stays
+    // one natural falloff-step below the peak instead of matching it.
     if (n > 1 && rawSum > peak) {
       let nonPeakScale = (peak * (n / MAGNIFICATION - 1)) / (rawSum - peak);
       if (nonPeakScale > 1) {
@@ -1466,7 +1484,7 @@ const extendedProjects =
         for (let j = 0; j < n; j++) {
           if (weightsBuffer[j] < peak && weightsBuffer[j] > maxNonPeak) maxNonPeak = weightsBuffer[j];
         }
-        if (maxNonPeak > 0) nonPeakScale = Math.min(nonPeakScale, peak/ maxNonPeak);
+        if (maxNonPeak > 0) nonPeakScale = Math.min(nonPeakScale, FALLOFF * peak / maxNonPeak);
       }
       for (let j = 0; j < n; j++) {
         if (weightsBuffer[j] < peak) weightsBuffer[j] *= nonPeakScale;
@@ -1583,7 +1601,7 @@ const extendedProjects =
           for (let j = 0; j < n; j++) {
             if (tmpWeights[j] < peak && tmpWeights[j] > maxNonPeak) maxNonPeak = tmpWeights[j];
           }
-          if (maxNonPeak > 0) nonPeakScale = Math.min(nonPeakScale, peak / maxNonPeak);
+          if (maxNonPeak > 0) nonPeakScale = Math.min(nonPeakScale, FALLOFF * peak / maxNonPeak);
         }
         for (let j = 0; j < n; j++) {
           if (tmpWeights[j] < peak) tmpWeights[j] *= nonPeakScale;
@@ -1627,7 +1645,7 @@ const extendedProjects =
   function restoreEdge(items: HTMLElement[]) {
     for (const item of items) {
       const overlay = item.querySelector('.title-fade-overlay') as HTMLElement;
-      if (overlay) gsap.to(overlay, { opacity: 0, duration: DURATION_ALT, ease: EASE, overwrite: 'auto' });
+      if (overlay) gsap.to(overlay, { opacity: 1, duration: DURATION_ALT, ease: EASE, overwrite: 'auto' });
     }
   }
 
@@ -2141,6 +2159,11 @@ const extendedProjects =
       const deltas = cachedMaxDeltas.filter(d => isFinite(d) && !isNaN(d));
       const maxDelta = deltas.length > 0 ? Math.max(...deltas) : 0;
       gsap.set(container, { y: maxDelta + 20 });
+
+      // Snapshot natural wrapper positions now: container y is final and all
+      // wrapper y-animations are 0, so getBoundingClientRect() is ground truth.
+      const snapScrollY = window.scrollY;
+      wrapperNaturalTops = allWrappers.map(w => w.getBoundingClientRect().top + snapScrollY);
 
       // Reveal once layout is finalised. Inline visibility/opacity prevent
       // the pre-init "stack of overlapping rows" flash on navigation in.

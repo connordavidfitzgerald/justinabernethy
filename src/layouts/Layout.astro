@@ -54,7 +54,8 @@ const FONTS: CssVariable[] = ["--font-sans"];
                     <a id="nav-info" href="/information" class="block">
                         <span id="nav-info-label" style="display: block;">Information</span>
                     </a>
-                    <span id="nav-info-close" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap;">Close</span>
+                    <span id="nav-info-close" class="cursor-pointer" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap;">Close</span>
+                    <span id="nav-info-scroll-top" class="cursor-pointer" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap;">Back to top</span>
                 </div>
             </div>
         </div>
@@ -71,39 +72,29 @@ const FONTS: CssVariable[] = ["--font-sans"];
             >
                 <!-- Desktop layout -->
                 <div
-                    class="hidden md:grid grid-cols-10 gap-gutter px-padding h-full font-normal text-md tracking-custom uppercase leading-[110%]"
+                    class="hidden md:grid grid-cols-10 gap-gutter px-padding h-full text-sm leading-[110%]"
                     style="padding-top: calc(var(--spacing-padding) * 2 + 1em);"
                 >
                     <!-- Left column: text content -->
-                    <div class="min-[1100px]:col-span-5 col-span-4 h-full flex flex-col justify-center">
-                        <div class="flex flex-col gap-padding w-full h-fit min-[1100px]:grid min-[1100px]:grid-cols-5 min-[1100px]:gap-gutter">
-                            <div class="min-[1100px]:col-span-3 flex flex-col gap-padding items-start">
-                                <div style="overflow: hidden; line-height: 1.1;">
-                                    <p id="info-reveal-bio" class="text-nowrap" style="display: block;">
-                                        Director and Photographer<br />Based in Toronto.
-                                    </p>
-                                </div>
-                                <div style="overflow: hidden; line-height: 1;">
-                                    <a
-                                        id="info-reveal-email"
-                                        href="mailto:info@justinabernethy.com"
-                                        class="block opacity-muted text-nowrap cursor-pointer"
-                                        style="display: block;"
-                                    >info@justinabernethy.com</a>
-                                </div>
+                    <div class="min-[1350px]:col-span-5 col-span-4 h-full flex flex-col justify-center">
+                        <div class="flex flex-col gap-padding w-full h-fit min-[1350px]:grid min-[1350px]:grid-cols-5 min-[1350px]:gap-gutter">
+                            <div class="min-[1350px]:col-span-3! flex flex-col gap-padding items-start">
+                                <p class="text-nowrap">
+                                    Director and Photographer Based in Toronto.<br/><span id="email"class="opacity-muted text-nowrap cursor-pointer">info@justinabernethy.com</span>
+                                </p>
                             </div>
-                            <div class="min-[1100px]:pt-0 pt-10 flex flex-row gap-10 min-[1100px]:gap-padding min-[1100px]:contents">
+                            <div class="min-[1350px]:pt-0 pt-10 flex flex-row gap-10 min-[1350px]:gap-padding min-[1350px]:contents">
                                 <div style="overflow: hidden; line-height: 1;">
                                     <span
                                         id="info-reveal-instagram"
-                                        class="block cursor-pointer hover:opacity-muted min-[1100px]:col-span-1 min-[1100px]:flex min-[1100px]:justify-end"
+                                        class="block cursor-pointer hover:opacity-muted min-[1350px]:col-span-1 min-[1350px]:flex min-[1350px]:justify-end"
                                         style="display: block;"
                                     >Instagram</span>
                                 </div>
                                 <div style="overflow: hidden; line-height: 1;">
                                     <span
                                         id="info-reveal-vimeo"
-                                        class="block cursor-pointer hover:opacity-muted min-[1100px]:col-span-1 min-[1100px]:flex min-[1100px]:justify-end min-[1100px]:pr-4"
+                                        class="block cursor-pointer hover:opacity-muted min-[1350px]:col-span-1 min-[1350px]:flex min-[1350px]:justify-end min-[1350px]:pr-4"
                                         style="display: block;"
                                     >Vimeo</span>
                                 </div>
@@ -112,12 +103,12 @@ const FONTS: CssVariable[] = ["--font-sans"];
                     </div>
 
                     <!-- Right column: headshot with reveal cover -->
-                    <div class="min-[1100px]:col-span-5 col-span-6 flex flex-row justify-end items-end h-full">
-                        <div class="w-full h-screen px-padding py-3" style="position: relative; overflow: hidden;">
+                    <div class="min-[1350px]:col-span-5 col-span-6 flex flex-row justify-end items-end h-full">
+                        <div class="w-full h-screen px-padding py-3 flex flex-col justify-end items-end overflow-clip" style="position: relative;">
                             <Picture
                                 src={headshot}
                                 alt="Justin Abernethy headshot"
-                                class="aspect-5/7 w-full h-full object-cover min-w-165"
+                                class="aspect-5/7 w-full h-auto object-cover min-h-157 max-h-[90vh]"
                             />
                             <div
                                 id="info-headshot-cover"
@@ -185,7 +176,8 @@ const FONTS: CssVariable[] = ["--font-sans"];
             const panel        = document.getElementById('info-panel')!;
             const navInfo      = document.getElementById('nav-info')!;
             const navInfoLabel = document.getElementById('nav-info-label')!;
-            const navInfoClose = document.getElementById('nav-info-close')!;
+            const navInfoClose     = document.getElementById('nav-info-close')!;
+            const navInfoScrollTop = document.getElementById('nav-info-scroll-top')!;
             const revealEls    = (
                 ['info-reveal-bio', 'info-reveal-email', 'info-reveal-instagram', 'info-reveal-vimeo']
                     .map(id => document.getElementById(id))
@@ -193,26 +185,33 @@ const FONTS: CssVariable[] = ["--font-sans"];
             ) as HTMLElement[];
             const headshotCover = document.getElementById('info-headshot-cover') as HTMLElement | null;
 
-            let overlayOpen = false;
+            let overlayOpen    = false;
+            let footerVisible  = false;
             let labelTl: gsap.core.Timeline | null = null;
 
             // Initial states
-            gsap.set(panel,         { clipPath: 'inset(0% 0% 100% 0%)' });
-            gsap.set(revealEls,     { clipPath: 'inset(0% 0% 100% 0%)' });
-            gsap.set(headshotCover, { clipPath: 'inset(0% 0% 0% 0%)' });
-            gsap.set(navInfoClose,  { yPercent: 110 });
+            gsap.set(panel,            { clipPath: 'inset(0% 0% 100% 0%)' });
+            gsap.set(revealEls,        { clipPath: 'inset(0% 0% 100% 0%)' });
+            gsap.set(headshotCover,    { clipPath: 'inset(0% 0% 0% 0%)' });
+            gsap.set(navInfoClose,     { yPercent: 110 });
+            gsap.set(navInfoScrollTop, { yPercent: 110 });
 
-            function swapLabel(toClose: boolean) {
+            // Slide in the requested label, slide everything else out.
+            // state: 'info' | 'close' | 'scroll-top'
+            function swapLabel(state: 'info' | 'close' | 'scroll-top') {
                 if (labelTl) labelTl.kill();
                 labelTl = gsap.timeline();
-                if (toClose) {
-                    labelTl
-                        .to(navInfoLabel, { yPercent: 110, duration: 0.22, ease: 'power3.in' })
-                        .to(navInfoClose, { yPercent: 0,   duration: 0.22, ease: 'power3.out' }, '-=0.05');
-                } else {
-                    labelTl
-                        .to(navInfoClose, { yPercent: 110, duration: 0.22, ease: 'power3.in' })
-                        .to(navInfoLabel, { yPercent: 0,   duration: 0.22, ease: 'power3.out' }, '-=0.05');
+                const targets = [
+                    { el: navInfoLabel,     active: state === 'info' },
+                    { el: navInfoClose,     active: state === 'close' },
+                    { el: navInfoScrollTop, active: state === 'scroll-top' },
+                ];
+                for (const { el, active } of targets) {
+                    if (active) {
+                        labelTl.to(el, { yPercent: 0,   duration: 0.22, ease: 'power3.out' }, '-=0.05');
+                    } else {
+                        labelTl.to(el, { yPercent: 110, duration: 0.22, ease: 'power3.in'  }, 0);
+                    }
                 }
             }
 
@@ -221,7 +220,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 overlayOpen = true;
                 overlay.style.pointerEvents = 'auto';
                 document.body.style.overflow = 'hidden';
-                swapLabel(true);
+                swapLabel('close');
 
                 // Background appears instantly
                 gsap.set(panel, { clipPath: 'inset(0% 0% 0% 0%)' });
@@ -247,7 +246,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 if (!overlayOpen) return;
                 overlayOpen = false;
                 document.body.style.overflow = '';
-                swapLabel(false);
+                swapLabel(footerVisible ? 'scroll-top' : 'info');
 
                 const tl = gsap.timeline({
                     onComplete: () => {
@@ -264,8 +263,13 @@ const FONTS: CssVariable[] = ["--font-sans"];
             navInfo.addEventListener('click', (e: MouseEvent) => {
                 if (window.innerWidth >= 768) {
                     e.preventDefault();
-                    if (overlayOpen) closeInfo();
-                    else openInfo();
+                    if (footerVisible) {
+                        ((window as any).lenis ?? window).scrollTo(0, { duration: 1.2, easing: (t: number) => 1 - Math.pow(1 - t, 3) });
+                    } else if (overlayOpen) {
+                        closeInfo();
+                    } else {
+                        openInfo();
+                    }
                 }
                 // mobile: falls through to normal /information navigation
             });
@@ -274,9 +278,29 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 if (window.innerWidth >= 768) closeInfo();
             });
 
+            navInfoScrollTop.addEventListener('click', () => {
+                if (window.innerWidth >= 768) {
+                    ((window as any).lenis ?? window).scrollTo(0, { duration: 1.2, easing: (t: number) => 1 - Math.pow(1 - t, 3) });
+                }
+            });
+
             document.addEventListener('keydown', (e: KeyboardEvent) => {
                 if (e.key === 'Escape' && overlayOpen) closeInfo();
             });
+
+            // ─── Footer visibility observer ───────────────────────────────────────
+            const desktopFooter = document.getElementById('desktop-footer');
+            if (desktopFooter) {
+                const footerObserver = new IntersectionObserver((entries) => {
+                    for (const entry of entries) {
+                        footerVisible = entry.isIntersecting;
+                        if (!overlayOpen) {
+                            swapLabel(footerVisible ? 'scroll-top' : 'info');
+                        }
+                    }
+                }, { threshold: 0.05 });
+                footerObserver.observe(desktopFooter);
+            }
         </script>
     </body>
 </html>
