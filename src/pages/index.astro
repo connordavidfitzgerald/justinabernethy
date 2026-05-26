@@ -78,20 +78,22 @@ const projectsWithUrls = projects.map(project => ({
 }));
 
 // Thumbnails sorted ascending by index for the preloader.
-// Use small images (300px wide, q=60) — the preloader image is only 104×130px
-// so there's no reason to fetch full-resolution Sanity assets here.
+// Use small images (300px wide, q=60) — the preloader image is only 104×130px.
 const preloaderThumbnails = projectsWithUrls
     .slice()
     .sort((a: any, b: any) => a.index - b.index)
-    .map((p: any) => p.thumbnailUrl ? `${p.thumbnailUrl}&w=300&q=60` : null)
+    .map((p: any) => p.thumbnail?.asset
+        ? urlForImage(p.thumbnail).width(300).quality(60).auto('format').url()
+        : null)
     .filter(Boolean) as string[];
 
-// Preload: preloader thumbnails (small, needed immediately) + first-row full images (needed after preloader)
+// Preload only the first-row images — they appear immediately after the preloader finishes.
+// Preloading the preloader thumbnails would flood the network queue (22+ hints) for no gain.
 const firstRowPreloads = projectsWithUrls
     .slice(0, ROW_SIZE)
     .filter((p: any) => p.thumbnailUrl)
     .map((p: any) => p.thumbnailUrl as string);
-const preloadImages = [...preloaderThumbnails, ...firstRowPreloads];
+const preloadImages = firstRowPreloads;
 
 // Info slide (project 00) for mobile slider
 const infoSlide = {
@@ -177,6 +179,7 @@ const extendedProjects =
                             alt={project.name ?? ''}
                             class="mux-thumb absolute inset-0 w-full h-full object-cover"
                             style="transition: opacity 0.3s;"
+                            loading={rowIndex === 0 ? 'eager' : 'lazy'}
                             fetchpriority={rowIndex === 0 ? 'high' : undefined}
                           />
                         </div>
@@ -187,6 +190,7 @@ const extendedProjects =
                           class="item-media w-full object-cover"
                           style="aspect-ratio: 5/7"
                           data-flip-id={`media-${project._id}`}
+                          loading={rowIndex === 0 ? 'eager' : 'lazy'}
                           fetchpriority={rowIndex === 0 ? 'high' : undefined}
                         />
                       )}
