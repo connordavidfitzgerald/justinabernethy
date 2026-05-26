@@ -6,11 +6,13 @@ import headshot from "../assets/images/JAFINALHEADSHOT.jpg";
 export interface Props {
     title: string;
     description?: string;
+    preloadImages?: string[];
 }
 
 const {
     title,
     description = "Astro + Tailwind + Sanity + Mux + GSAP + Cloudflare",
+    preloadImages = [],
 } = Astro.props;
 const FONTS: CssVariable[] = ["--font-sans"];
 ---
@@ -23,6 +25,9 @@ const FONTS: CssVariable[] = ["--font-sans"];
         <meta name="viewport" content="width=device-width" />
         <meta name="generator" content={Astro.generator} />
         <meta name="description" content={description} />
+        <link rel="preconnect" href="https://cdn.sanity.io" crossorigin />
+        <link rel="dns-prefetch" href="https://cdn.sanity.io" />
+        {preloadImages.map((url) => <link rel="preload" as="image" href={url} />)}
         {FONTS.map((font) => <Font cssVariable={font} preload />)}
         <title>{title}</title>
     </head>
@@ -105,11 +110,13 @@ const FONTS: CssVariable[] = ["--font-sans"];
                     <!-- Right column: headshot with reveal cover -->
                     <div class="min-[1350px]:col-span-5 col-span-6 flex flex-row justify-end items-end h-full">
                         <div class="w-full h-screen px-padding py-3 flex flex-col justify-end items-end overflow-clip" style="position: relative;">
-                            <Picture
-                                src={headshot}
-                                alt="Justin Abernethy headshot"
-                                class="aspect-5/7 w-full h-auto object-cover min-h-157 max-h-[90vh]"
-                            />
+                            <div class="w-full">
+                                <Picture
+                                    src={headshot}
+                                    alt="Justin Abernethy headshot"
+                                    class="aspect-5/7 w-full h-auto object-cover min-h-157 max-h-[90vh]"
+                                />
+                            </div>
                             <div
                                 id="info-headshot-cover"
                                 style="position: absolute; inset: 0; background: var(--bg-primary); z-index: 5;"

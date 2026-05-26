@@ -68,11 +68,11 @@ const projectsWithUrls = projects.map(project => ({
   slug: project.name ? nameToSlug(project.name) : project._id,
   // 900px covers gallery grid, sidebar preview, mobile (2× retina ~430px → 860px)
   thumbnailUrl: project.thumbnail?.asset
-    ? urlForImage(project.thumbnail).width(900).quality(100).auto('format').url()
+    ? urlForImage(project.thumbnail).width(900).quality(80).auto('format').url()
     : null,
   // 1400px covers fullscreen overlay (portrait ~700px, landscape up to ~1400px)
   galleryUrls: project.imageGallery?.filter((img: any) => img?.asset).map((img: any) => ({
-    url: urlForImage(img).width(1400).quality(100).auto('format').url(),
+    url: urlForImage(img).width(1400).quality(80).auto('format').url(),
     _key: img._key
   })) || []
 }));
@@ -85,6 +85,13 @@ const preloaderThumbnails = projectsWithUrls
     .sort((a: any, b: any) => a.index - b.index)
     .map((p: any) => p.thumbnailUrl ? `${p.thumbnailUrl}&w=300&q=60` : null)
     .filter(Boolean) as string[];
+
+// Preload: preloader thumbnails (small, needed immediately) + first-row full images (needed after preloader)
+const firstRowPreloads = projectsWithUrls
+    .slice(0, ROW_SIZE)
+    .filter((p: any) => p.thumbnailUrl)
+    .map((p: any) => p.thumbnailUrl as string);
+const preloadImages = [...preloaderThumbnails, ...firstRowPreloads];
 
 // Info slide (project 00) for mobile slider
 const infoSlide = {
@@ -128,7 +135,7 @@ const extendedProjects =
   }
 </style>
 
-<Layout title="Justin Abernethy">
+<Layout title="Justin Abernethy" preloadImages={preloadImages}>
   <Preloader thumbnails={preloaderThumbnails} />
   <main class="hidden md:block p-padding bg-theme text-theme">
     <section class="relative">
@@ -161,7 +168,7 @@ const extendedProjects =
                       {project.muxID && !project.thumbnail?.asset ? (
                         <MuxPlayer
                           playbackId={project.muxID}
-                          class="item-media w-full object-cov   er aspect-16/9"
+                          class="item-media w-full object-cover aspect-16/9"
                           style={{ '--controls': 'none' }}
                           muted
                           loop
@@ -169,11 +176,12 @@ const extendedProjects =
                         />
                       ) : (
                         <img
-                          src={urlForImage(project.thumbnail).width(900).quality(100).auto('format').url()}
+                          src={urlForImage(project.thumbnail).width(900).quality(80).auto('format').url()}
                           alt={project.name}
                           class="item-media w-full object-cover"
                           style="aspect-ratio: 5/7"
                           data-flip-id={`media-${project._id}`}
+                          fetchpriority={rowIndex === 0 ? 'high' : undefined}
                         />
                       )}
                       <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-normal tracking-custom -mt-0 pb-padding">

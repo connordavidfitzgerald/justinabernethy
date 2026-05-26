@@ -58,6 +58,14 @@ const { thumbnails } = Astro.props;
         return;
     }
 
+    // Only run once per session — skip on refresh or back-navigation
+    if (sessionStorage.getItem('preloader-shown')) {
+        var el = document.getElementById('preloader');
+        if (el) el.remove();
+        return;
+    }
+    sessionStorage.setItem('preloader-shown', '1');
+
     // Signal to gallery init() that the preloader is handling the reveal
     window.__PRELOADER_ACTIVE__ = true;
 
@@ -94,6 +102,12 @@ const { thumbnails } = Astro.props;
 
         var preloader = document.getElementById('preloader');
         if (preloader) preloader.remove();
+
+        // Remove wrapper covers instantly — they only exist to fill the dead zone
+        // above each gallery-row during the old preloader's opacity fade.
+        document.querySelectorAll('.gallery-row-wrapper').forEach(function (w) {
+            if (w.__wrapperCover) { w.__wrapperCover.remove(); delete w.__wrapperCover; }
+        });
 
         var stage2TotalMs = (NAV_IDS.length - 1) * STAGE2_STAGGER_S * 1000 + STAGE2_ANIM_S * 1000;
         var stage3StartMs = STAGE2_OFFSET_MS + stage2TotalMs + STAGE3_GAP_MS;
@@ -259,15 +273,18 @@ const { thumbnails } = Astro.props;
                 setTimeout(function () {
                     var cover = item.__preloaderCover;
                     if (!cover) return;
-                    gsap.to(cover, {
-                        yPercent: -100,
-                        duration: COVER_ANIM_S,
-                        ease: COVER_EASE,
-                        onComplete: function () {
-                            cover.remove();
-                            delete item.__preloaderCover;
+                    gsap.fromTo(cover,
+                        { clipPath: 'inset(-4px -4px -4px -4px)' },
+                        {
+                            clipPath: 'inset(110% -4px -4px -4px)',
+                            duration: COVER_ANIM_S,
+                            ease: COVER_EASE,
+                            onComplete: function () {
+                                cover.remove();
+                                delete item.__preloaderCover;
+                            }
                         }
-                    });
+                    );
                 }, delay);
             })(seq[i], times[i]);
         }
@@ -324,13 +341,25 @@ const { thumbnails } = Astro.props;
 
         document.body.style.overflow = 'hidden';
 
+        var seenWrappers = typeof Set !== 'undefined' ? new Set() : null;
         for (var i = 0; i < capturedItems.length; i++) {
             var cover = document.createElement('div');
             cover.style.cssText =
-                'position:absolute;inset:0;z-index:15;pointer-events:none;' +
-                'background:var(--bg-primary);';
+                'position:absolute;inset:-4px;z-index:15;pointer-events:none;' +
+                'background:var(--bg-primary);will-change:clip-path;';
             capturedItems[i].appendChild(cover);
             capturedItems[i].__preloaderCover = cover;
+
+            // Cover the dead zone above each gallery-row inside its wrapper.
+            // This space has no item cover and bleeds through the fading preloader overlay.
+            var rowWrapper = capturedItems[i].closest('.gallery-row-wrapper');
+            if (rowWrapper && !(seenWrappers ? seenWrappers.has(rowWrapper) : rowWrapper.__wrapperCover)) {
+                if (seenWrappers) seenWrappers.add(rowWrapper);
+                var wc = document.createElement('div');
+                wc.style.cssText = 'position:absolute;inset:0;z-index:14;pointer-events:none;background:var(--bg-primary);';
+                rowWrapper.appendChild(wc);
+                rowWrapper.__wrapperCover = wc;
+            }
         }
 
         var gsap = window.gsap;

@@ -51,7 +51,7 @@ export default defineConfig({
       projectId: "t3fe0x9u",
       dataset: "production",
       // Set useCdn to false if you're building statically.
-      useCdn: false,
+      useCdn: true,
       apiVersion: "2026-04-01",
     }),
     svelte(),

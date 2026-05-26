@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Hide scrollbar across all browsers */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
 /* Lenis smooth scroll */
 html.lenis,
 html.lenis body {
