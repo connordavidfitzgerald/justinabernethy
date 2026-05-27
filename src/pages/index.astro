@@ -1183,8 +1183,8 @@ const extendedProjects =
     // For tall projects: fillStart = 2.2*vh (hint begins when project bottom exits viewport).
     // For short projects: fillStart = initialWrapperTop - 1 (hint begins on first scroll px).
     const initialWrapperTop = firstVisibleWrapper.getBoundingClientRect().top;
-    const fillStart = Math.min(initialWrapperTop - 1, window.innerHeight * 2.2);
-    const fillEnd   = window.innerHeight * 0.01;
+    const fillStart = Math.min(initialWrapperTop - 1, window.innerHeight * 3);
+    const fillEnd   = window.innerHeight * -0.2;
 
     const CLOSE_THRESHOLD = window.innerHeight * 0.05;
 
@@ -1212,12 +1212,12 @@ const extendedProjects =
       const hintEl     = document.getElementById('scroll-back-hint') as HTMLElement | null;
       const progress   = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
 
-      const REVEAL_START = 0.35;
+      const REVEAL_START = 0.5;
 
       if (scrollFill) {
         // Fill completes exactly when the cover starts sliding (REVEAL_START)
         const fillProgress = Math.min(1, progress / REVEAL_START);
-        scrollFill.style.clipPath = `inset(0 ${(1 - fillProgress) * 100}% 0 0)`;
+        scrollFill.style.clipPath = `inset(0 ${(1 - fillProgress) * 200}% 0 0)`;
       }
 
       if (hintEl) {
