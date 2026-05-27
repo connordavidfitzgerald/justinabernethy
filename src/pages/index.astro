@@ -1183,17 +1183,19 @@ const extendedProjects =
     // For tall projects: fillStart = 2.2*vh (hint begins when project bottom exits viewport).
     // For short projects: fillStart = initialWrapperTop - 1 (hint begins on first scroll px).
     const initialWrapperTop = firstVisibleWrapper.getBoundingClientRect().top;
-    const fillStart = Math.min(initialWrapperTop - 1, window.innerHeight * 2);
+    const fillStart = Math.min(initialWrapperTop - 1, window.innerHeight * 2.2);
     const fillEnd   = window.innerHeight * 0.01;
+
+    const CLOSE_THRESHOLD = window.innerHeight * 0.05;
 
     scrollObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
-        if (isProjectOpen && entry.boundingClientRect.top <= 0) {
+        if (isProjectOpen && entry.boundingClientRect.top <= CLOSE_THRESHOLD) {
           closeProject(true);
         }
       }
     }, {
-      threshold: [0, 0.1, 0.25, 0.5],
+      threshold: [0, 0.1, 0.25, 0.5, 0.7],
       rootMargin: '0px 0px 0px 0px'
     });
 
@@ -1202,7 +1204,7 @@ const extendedProjects =
     scrollHandler = () => {
       if (!isProjectOpen) return;
       const wrapperRect = firstVisibleWrapper.getBoundingClientRect();
-      if (wrapperRect.bottom <= 0) {
+      if (wrapperRect.top <= CLOSE_THRESHOLD) {
         closeProject(true);
         return;
       }
