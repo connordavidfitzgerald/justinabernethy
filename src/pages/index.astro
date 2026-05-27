@@ -336,7 +336,7 @@ const extendedProjects =
       <span data-mux-ctl="fullscreen" class="cursor-pointer hover:opacity-70 hidden md:inline pointer-events-auto">FULLSCREEN</span>
     </div>
     <div class="h-100"></div>
-    <div id="desktop-footer" class="h-screen min-h-220 grid! grid-cols-10! gap-gutter text-sm leading-[110%]" style="visibility: hidden; opacity: 0;">
+    <div id="desktop-footer" class="h-screen min-h-270 grid! grid-cols-10! gap-gutter text-sm leading-[110%]" style="visibility: hidden; opacity: 0;">
         <div class="min-[1350px]:col-span-5 col-span-4 h-full flex flex-col justify-center">
             <div class="flex flex-col gap-padding w-full h-fit min-[1350px]:grid min-[1350px]:grid-cols-5 min-[1350px]:gap-gutter">
                 <div class="min-[1350px]:col-span-3! flex flex-row items-start justify-start">
@@ -350,9 +350,13 @@ const extendedProjects =
                 </div>
             </div>
         </div>
-        <div class="min-[1350px]:col-span-5 col-span-6 flex flex-row justify-end items-end h-full">
-            <div class="w-full h-screen px-padding py-3 flex flex-col justify-end items-end overflow-clip">
-                <Picture src={headshot} alt="Justin Abernethy headshot" class="aspect-5/7 w-full h-auto object-cover min-h-157 max-h-[90vh]"></Picture>
+        <div class="min-[1350px]:col-span-5 col-span-6 h-full flex flex-col justify-end items-end overflow-hidden px-padding">
+            <div class="w-full aspect-5/7 overflow-hidden mb-3" style="max-height: calc(100% - 0.75rem);">
+                <Picture
+                    src={headshot}
+                    alt="Justin Abernethy headshot"
+                    class="w-full h-full object-cover"
+                />
             </div>
         </div>
     </div>
