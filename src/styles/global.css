@@ -150,12 +150,16 @@ mux-player {
 #detail-image-gallery [id="detail-first-image"],
 #detail-image-gallery .col-span-1.w-full.overflow-hidden {
   cursor: pointer;
-  transition: opacity 0.2s ease;
 }
 
-#detail-image-gallery [id="detail-first-image"]:hover,
-#detail-image-gallery .col-span-1.w-full.overflow-hidden:hover {
-  opacity: 0.9;
+#detail-image-gallery [id="detail-first-image"] img,
+#detail-image-gallery .col-span-1.w-full.overflow-hidden img {
+  transition: transform 0.5s ease;
+}
+
+#detail-image-gallery [id="detail-first-image"]:hover img,
+#detail-image-gallery .col-span-1.w-full.overflow-hidden:hover img {
+  transform: scale(1.04);
 }
 /* Overlay base transitions */
 

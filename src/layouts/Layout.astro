@@ -250,7 +250,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 if (window.innerWidth >= 768) {
                     e.preventDefault();
                     if (footerVisible) {
-                        ((window as any).lenis ?? window).scrollTo(0, { duration: 1.2, easing: (t: number) => 1 - Math.pow(1 - t, 3) });
+                        ((window as any).lenis ?? window).scrollTo(0, { duration: 1.8, easing: (t: number) => 1 - Math.pow(1 - t, 10) });
                     } else if (overlayOpen) {
                         closeInfo();
                     } else {
