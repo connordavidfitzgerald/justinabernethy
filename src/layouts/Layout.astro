@@ -72,6 +72,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
         <div
             id="info-overlay"
             style="position: fixed; inset: 0; z-index: 10000; pointer-events: none;"
+            class="min-h-270 "
         >
             <div
                 id="info-panel"
@@ -80,7 +81,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
             >
                 <!-- Desktop layout -->
                 <div
-                    class="hidden md:grid grid-cols-10 gap-gutter px-padding h-full text-sm leading-[110%]"
+                    class="hidden md:grid grid-cols-10 gap-gutter px-padding h-full text-sm leading-[110%] max-h-screen! "
                     style="padding-top: calc(var(--spacing-padding) * 2 + 1em);"
                 >
                     <!-- Left column: text content -->
@@ -93,37 +94,33 @@ const FONTS: CssVariable[] = ["--font-sans"];
                             </div>
                             <div class="min-[1350px]:pt-0 pt-10 flex flex-row gap-10 min-[1350px]:gap-padding min-[1350px]:contents">
                                 <div style="overflow: hidden; line-height: 1;">
-                                    <span
+                                    <a
                                         id="info-reveal-instagram"
                                         class="block cursor-pointer hover:opacity-muted min-[1350px]:col-span-1 min-[1350px]:flex min-[1350px]:justify-end"
                                         style="display: block;"
-                                    >Instagram</span>
+                                        href="https://www.instagram.com/nethyj/"
+                                    >Instagram</a>
                                 </div>
                                 <div style="overflow: hidden; line-height: 1;">
-                                    <span
+                                    <a
                                         id="info-reveal-vimeo"
                                         class="block cursor-pointer hover:opacity-muted min-[1350px]:col-span-1 min-[1350px]:flex min-[1350px]:justify-end min-[1350px]:pr-4"
                                         style="display: block;"
-                                    >Vimeo</span>
+                                        href="https://vimeo.com/user96868841"
+                                    >Vimeo</a>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Right column: headshot with reveal cover -->
-                    <div class="min-[1350px]:col-span-5 col-span-6 flex flex-row justify-end items-end h-full">
-                        <div class="w-full h-screen px-padding py-3 flex flex-col justify-end items-end overflow-clip" style="position: relative;">
-                            <div class="w-full">
-                                <Picture
-                                    src={headshot}
-                                    alt="Justin Abernethy headshot"
-                                    class="aspect-5/7 w-full h-auto object-cover min-h-157 max-h-[90vh]"
-                                />
-                            </div>
-                            <div
-                                id="info-headshot-cover"
-                                style="display: none;"
-                            ></div>
+                    <!-- Right column: headshot -->
+                    <div class="min-[1350px]:col-span-5 col-span-6 h-full flex flex-col justify-end items-end overflow-hidden px-padding">
+                        <div class="w-full aspect-5/7 overflow-hidden mb-3" style="max-height: calc(100% - 0.75rem);">
+                            <Picture
+                                src={headshot}
+                                alt="Justin Abernethy headshot"
+                                class="w-full h-full object-cover"
+                            />
                         </div>
                     </div>
                 </div>
@@ -253,7 +250,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 if (window.innerWidth >= 768) {
                     e.preventDefault();
                     if (footerVisible) {
-                        ((window as any).lenis ?? window).scrollTo(0, { duration: 1.8, easing: (t: number) => 1 - Math.pow(1 - t, 10) });
+                        ((window as any).lenis ?? window).scrollTo(0, { duration: 2.4, easing: (t: number) => 1 - Math.pow(1 - t, 10) });
                     } else if (overlayOpen) {
                         closeInfo();
                     } else {

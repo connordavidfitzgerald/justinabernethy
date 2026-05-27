@@ -347,8 +347,8 @@ const extendedProjects =
                     </p>
                 </div>
                 <div class="min-[1350px]:pt-0 pt-10 flex flex-row gap-10 min-[1350px]:gap-padding min-[1350px]:contents ">
-                    <div id="footer-button" class="min-[1350px]:col-span-1 min-[1350px]:justify-end flex flex-row justify-start items-start hover:opacity-muted cursor-pointer">Instagram</div>
-                    <div id="footer-button" class="min-[1350px]:col-span-1 min-[1350px]:justify-end min-[1350px]:pr-4  flex flex-row justify-start  items-start hover:opacity-muted cursor-pointer">Vimeo</div>
+                    <a href="https://www.instagram.com/nethyj/" id="footer-button" class="min-[1350px]:col-span-1 min-[1350px]:justify-end flex flex-row justify-start items-start hover:opacity-muted cursor-pointer">Instagram</a>
+                    <a href="https://vimeo.com/user96868841" id="footer-button" class="min-[1350px]:col-span-1 min-[1350px]:justify-end min-[1350px]:pr-4  flex flex-row justify-start  items-start hover:opacity-muted cursor-pointer">Vimeo</a>
                 </div>
             </div>
         </div>
@@ -990,7 +990,7 @@ const extendedProjects =
     const scrollHint = document.getElementById('scroll-back-hint') as HTMLElement | null;
     const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
     if (scrollHint) {
-      gsap.set(scrollHint, { opacity: 0 });
+      gsap.to(scrollHint, { opacity: 0, duration: 0.8, ease: 'power2.out' });
       scrollHint.style.transform = 'translateY(0)';
     }
     if (scrollFill) scrollFill.style.clipPath = 'inset(0 100% 0 0)';
@@ -1190,13 +1190,11 @@ const extendedProjects =
       }
       const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
       const hintEl     = document.getElementById('scroll-back-hint') as HTMLElement | null;
-      const fillStart  = window.innerHeight * 1.5;         // begin once the gallery row enters the viewport
-      const fillEnd    = window.innerHeight * -0.1; // complete when it's 10% above the top edge
+      const fillStart  = window.innerHeight * 3.5;
+      const fillEnd    = window.innerHeight * 0.1;
       const progress   = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
 
-      // Phase 1 ends / Phase 2 begins at this progress value
-      // At REVEAL_START, wrapperRect.top ≈ vh so gallery emerges right under the cover's bottom edge
-      const REVEAL_START = 0.3;
+      const REVEAL_START = 0.65;
 
       if (scrollFill) {
         // Fill completes exactly when the cover starts sliding (REVEAL_START)
