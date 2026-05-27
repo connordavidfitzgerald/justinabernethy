@@ -314,29 +314,27 @@ const extendedProjects =
           </div>
         </div>
 
-        <!-- Mux custom controls (moved into the video wrapper at render time) -->
-        <div
-          id="overlay-mux-controls"
-          class="absolute bottom-0 left-0 right-0 z-50 px-padding py-padding flex flex-row justify-between items-center gap-4 text-white mix-blend-difference text-sm uppercase tracking-custom font-medium opacity-0 pointer-events-none transition-opacity duration-200"
-        >
-          <div class="flex flex-row gap-4 pointer-events-auto items-center">
-            <span data-mux-ctl="playpause" class="cursor-pointer hover:opacity-70">PLAY</span>
-
-            <span data-mux-ctl="mute" class="cursor-pointer hover:opacity-70">UNMUTE</span>
-
-          </div>
-
-          <div data-mux-ctl="timeline" class="flex-1 relative h-3 cursor-pointer pointer-events-auto select-none touch-none">
-            <div class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-white"></div>
-            <div data-mux-ctl="thumb" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full bg-white" style="left: 0%"></div>
-          </div>
-          <span class="inline-flex gap-1 tabular-nums">
-            <span data-mux-ctl="current">00:00</span><span>/</span><span data-mux-ctl="duration">00:00</span>
-          </span>
-           <span data-mux-ctl="fullscreen" class="cursor-pointer hover:opacity-70 hidden md:inline pointer-events-auto">FULLSCREEN</span>
-        </div>
       </div>
     </section>
+
+    <!-- Mux custom controls — shared between single-view overlay and project detail player -->
+    <div
+      id="overlay-mux-controls"
+      class="fixed z-[10002] px-padding py-padding flex flex-row justify-between items-center gap-4 text-white mix-blend-difference text-sm uppercase tracking-custom font-medium opacity-0 pointer-events-none transition-opacity duration-200"
+    >
+      <div class="flex flex-row gap-4 pointer-events-auto items-center">
+        <span data-mux-ctl="playpause" class="cursor-pointer hover:opacity-70">PLAY</span>
+        <span data-mux-ctl="mute" class="cursor-pointer hover:opacity-70">UNMUTE</span>
+      </div>
+      <div data-mux-ctl="timeline" class="flex-1 relative h-3 cursor-pointer pointer-events-auto select-none touch-none">
+        <div class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-white"></div>
+        <div data-mux-ctl="thumb" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full bg-white" style="left: 0%"></div>
+      </div>
+      <span class="inline-flex gap-1 tabular-nums">
+        <span data-mux-ctl="current">00:00</span><span>/</span><span data-mux-ctl="duration">00:00</span>
+      </span>
+      <span data-mux-ctl="fullscreen" class="cursor-pointer hover:opacity-70 hidden md:inline pointer-events-auto">FULLSCREEN</span>
+    </div>
     <div class="h-100"></div>
     <div id="desktop-footer" class="h-screen min-h-220 grid! grid-cols-10! gap-gutter text-sm leading-[110%]" style="visibility: hidden; opacity: 0;">
         <div class="min-[1350px]:col-span-5 col-span-4 h-full flex flex-col justify-center">
@@ -689,7 +687,8 @@ const extendedProjects =
   }
 
   function populateProjectDetail(project: any) {
-    // Clear existing gallery
+    // Clear existing gallery and detach any active video controls
+    detachMuxControls();
     detailImageGallery!.innerHTML = '';
 
     // Build first slot
@@ -723,6 +722,13 @@ const extendedProjects =
       `;
     }
     detailImageGallery!.appendChild(firstSlot);
+
+    if (project.muxID && !project.thumbnailUrl) {
+      customElements.whenDefined('mux-player').then(() => {
+        const player = firstSlot.querySelector('mux-player') as MuxPlayer | null;
+        if (player) attachMuxControls(player);
+      });
+    }
 
     // Batch-append gallery slots via DocumentFragment (single reflow)
     if (project.galleryUrls && project.galleryUrls.length > 0) {
@@ -985,6 +991,7 @@ const extendedProjects =
     history.replaceState(null, '', location.pathname + location.search);
 
     cleanupScrollObserver();
+    detachMuxControls();
 
     // Reset scroll hint
     const scrollHint = document.getElementById('scroll-back-hint') as HTMLElement | null;
