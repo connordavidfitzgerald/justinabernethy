@@ -162,6 +162,7 @@ mux-player {
 #detail-image-gallery [id="detail-first-image"]:hover img,
 #detail-image-gallery .col-span-1.w-full.overflow-hidden:hover img {
   transform: scale(1.04);
+  transition-delay: 0.2;
 }
 /* Overlay base transitions */
 

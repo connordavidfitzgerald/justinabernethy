@@ -283,9 +283,9 @@ const extendedProjects =
           </div>
         </div>
         <!-- Scroll back hint -->
-        <div id="scroll-back-hint" class="fixed inset-0 z-30 bg-theme flex flex-col justify-center items-center text-sm uppercase tracking-custom font-normal select-none pointer-events-none" style="opacity: 0;">
+        <div id="scroll-back-hint" class="fixed inset-0 z-30 bg-theme flex flex-col justify-center items-center text-sm uppercase tracking-custom font-normal select-none pointer-events-none h-screen" style="opacity: 0;">
           <div class="relative">
-            <span class="opacity-[var(--opacity-muted)]">scroll to go back to projects</span>
+            <span class="opacity-(--opacity-muted)">scroll to go back to projects</span>
             <span id="scroll-back-fill" class="absolute inset-0 overflow-hidden whitespace-nowrap" style="clip-path: inset(0 100% 0 0);">scroll to go back to projects</span>
           </div>
         </div>
@@ -941,9 +941,14 @@ const extendedProjects =
 
         // Reveal gallery images
         const galleryCovers = detailImageGallery!.querySelectorAll('.gallery-image-cover');
+        const gallerySlots  = detailImageGallery!.querySelectorAll<HTMLElement>('[id="detail-first-image"], .col-span-1.w-full.overflow-hidden');
+        gallerySlots.forEach(s => { s.style.pointerEvents = 'none'; });
         gsap.fromTo(galleryCovers,
           { y: 0 },
-          { y: '100%', duration: 1.2, ease: "power3.inOut", stagger: 0.2, delay: 0.8 }
+          {
+            y: '100%', duration: 1.2, ease: "power3.inOut", stagger: 0.2, delay: 0.8,
+            onComplete: () => { gallerySlots.forEach(s => { s.style.pointerEvents = ''; }); }
+          }
         );
 
         for (let i = 0; i < allWrappers.length; i++) {
@@ -1001,7 +1006,7 @@ const extendedProjects =
     const scrollHint = document.getElementById('scroll-back-hint') as HTMLElement | null;
     const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
     if (scrollHint) {
-      gsap.to(scrollHint, { opacity: 0, duration: 0.8, ease: 'power2.out' });
+      gsap.to(scrollHint, { opacity: 0, duration: 1.2, ease: 'power2.out' });
       scrollHint.style.transform = 'translateY(0)';
     }
     if (scrollFill) scrollFill.style.clipPath = 'inset(0 100% 0 0)';
@@ -1174,19 +1179,26 @@ const extendedProjects =
     if (scrollObserver) scrollObserver.disconnect();
     if (scrollHandler) window.removeEventListener('scroll', scrollHandler);
 
-    const firstVisibleIndex = 0;
-    const firstVisibleWrapper = allWrappers[firstVisibleIndex];
-
+    const firstVisibleWrapper = allWrappers[0];
     if (!firstVisibleWrapper) return;
 
-    // Capture wrapper position at scrollY=0 so fillStart adapts to project height.
-    // For tall projects: fillStart = 2.2*vh (hint begins when project bottom exits viewport).
-    // For short projects: fillStart = initialWrapperTop - 1 (hint begins on first scroll px).
-    const initialWrapperTop = firstVisibleWrapper.getBoundingClientRect().top;
-    const fillStart = Math.min(initialWrapperTop - 1, window.innerHeight * 3);
-    const fillEnd   = window.innerHeight * -0.2;
+    // Reset hint to hidden at start of each project open
+    const hintElInit = document.getElementById('scroll-back-hint') as HTMLElement | null;
+    if (hintElInit) { hintElInit.style.opacity = '0'; hintElInit.style.transform = 'translateY(0)'; }
+    const fillElInit = document.getElementById('scroll-back-fill') as HTMLElement | null;
+    if (fillElInit) fillElInit.style.clipPath = 'inset(0 100% 0 0)';
 
-    const CLOSE_THRESHOLD = window.innerHeight * 0.05;
+    const initialWrapperTop = firstVisibleWrapper.getBoundingClientRect().top;
+    const fillStart = Math.min(initialWrapperTop - 1, window.innerHeight * 2.2);
+    // Close fires when gallery has scrolled 1.5*vh past viewport top — gives ~2x total scroll range.
+    const CLOSE_THRESHOLD = window.innerHeight * 0.2;
+    const range = fillStart - CLOSE_THRESHOLD*0.2;
+
+    // Phase fractions over [0=start scrolling, 1=close fires]
+    const FADE_IN_START = 0.12; // hint starts appearing (delayed)
+    const FADE_IN_END   = 0.24; // hint fully opaque
+    const FILL_START_F  = 0.18; // fill begins
+    const FILL_END_F    = 0.60; // fill completes before gallery enters viewport (~progress 0.32)
 
     scrollObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
@@ -1198,7 +1210,6 @@ const extendedProjects =
       threshold: [0, 0.1, 0.25, 0.5, 0.7],
       rootMargin: '0px 0px 0px 0px'
     });
-
     scrollObserver.observe(firstVisibleWrapper);
 
     scrollHandler = () => {
@@ -1210,27 +1221,26 @@ const extendedProjects =
       }
       const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
       const hintEl     = document.getElementById('scroll-back-hint') as HTMLElement | null;
-      const progress   = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
-
-      const REVEAL_START = 0.5;
+      const progress   = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / range));
 
       if (scrollFill) {
-        // Fill completes exactly when the cover starts sliding (REVEAL_START)
-        const fillProgress = Math.min(1, progress / REVEAL_START);
-        scrollFill.style.clipPath = `inset(0 ${(1 - fillProgress) * 200}% 0 0)`;
+        const fillProgress = Math.max(0, Math.min(1,
+          (progress - FILL_START_F) / (FILL_END_F - FILL_START_F)
+        ));
+        scrollFill.style.clipPath = `inset(0 ${(1 - fillProgress) * 100}% 0 0)`;
       }
 
       if (hintEl) {
-        // Fade in quickly as we enter the zone
-        hintEl.style.opacity = String(Math.min(1, progress * 8));
-
-        // Slide hint so its bottom edge tracks the gallery top exactly — no gap, no overlap
-        if (wrapperRect.top < window.innerHeight) {
-          const slidePercent = ((1 - wrapperRect.top / window.innerHeight)+2)* 100;
-          hintEl.style.transform = `translateY(-${slidePercent}%)`;
-        } else {
-          hintEl.style.transform = 'translateY(0)';
-        }
+        // Fade in based on scroll progress
+        const baseOpacity = Math.max(0, Math.min(1,
+          (progress - FADE_IN_START) / (FADE_IN_END - FADE_IN_START)
+        ));
+        // Fade out as gallery scrolls up from the bottom into view
+        const FADE_OUT_END = window.innerHeight * 0.8;
+        const fadeOut = wrapperRect.top >= window.innerHeight
+          ? 1
+          : Math.max(0, (wrapperRect.top - FADE_OUT_END) / (window.innerHeight - FADE_OUT_END));
+        hintEl.style.opacity = String(baseOpacity * fadeOut);
       }
     };
 
