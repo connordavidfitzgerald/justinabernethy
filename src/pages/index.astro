@@ -1855,8 +1855,8 @@ const extendedProjects =
       container.appendChild(muxControls);
       muxControls.style.position   = 'absolute';
       muxControls.style.bottom     = '0.3rem';
-      muxControls.style.left       = '0';
-      muxControls.style.right      = '0';
+      muxControls.style.left       = '0.3rem';
+      muxControls.style.right      = '0.3rem';
       muxControls.style.width      = '';
       muxControls.style.top        = '';
       muxControls.style.opacity    = '1';
@@ -1944,7 +1944,12 @@ const extendedProjects =
       player.setAttribute('playsinline', '');
       player.setAttribute('disable-tracking', '');
       player.style.setProperty('--controls', 'none');
-      overlayMediaContainer.appendChild(player);
+
+      // Wrap in a sizer div so controls anchor to the video bottom, not the full-height container
+      const playerSizer = document.createElement('div');
+      playerSizer.style.cssText = 'width: 100%;';
+      playerSizer.appendChild(player);
+      overlayMediaContainer.appendChild(playerSizer);
 
       customElements.whenDefined('mux-player').then(() => {
         player.play?.().catch(() => { /* autoplay blocked */ });
