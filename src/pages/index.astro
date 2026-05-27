@@ -230,7 +230,7 @@ const extendedProjects =
                     <div class="grid absolute inset-0" id="detail-preview-grid">
                       {projectsWithUrls.map((project) => (
                         <div
-                          class="preview-item opacity-0 col-start-1 row-start-1 flex items-center"
+                          class="preview-item opacity-0 col-start-1 row-start-1 flex items-end"
                           data-preview-id={project._id}
                         >
                           {project.muxID && !project.thumbnailUrl ? (
@@ -320,7 +320,7 @@ const extendedProjects =
     <!-- Mux custom controls — shared between single-view overlay and project detail player -->
     <div
       id="overlay-mux-controls"
-      class="fixed z-[10002] px-padding py-padding flex flex-row justify-between items-center gap-4 text-white mix-blend-difference text-sm uppercase tracking-custom font-medium opacity-0 pointer-events-none transition-opacity duration-200"
+      class="px-padding py-padding flex flex-row justify-between items-center gap-4 text-white mix-blend-difference text-sm uppercase tracking-custom font-medium opacity-0 pointer-events-none transition-opacity duration-200"
     >
       <div class="flex flex-row gap-4 pointer-events-auto items-center">
         <span data-mux-ctl="playpause" class="cursor-pointer hover:opacity-70">PLAY</span>
@@ -686,7 +686,7 @@ const extendedProjects =
     return projectsData.find(p => p._id === id);
   }
 
-  function populateProjectDetail(project: any) {
+  function populateProjectDetail(project: any, { instant = false } = {}) {
     // Clear existing gallery and detach any active video controls
     detachMuxControls();
     detailImageGallery!.innerHTML = '';
@@ -696,11 +696,11 @@ const extendedProjects =
     firstSlot.id = 'detail-first-image';
 
     if (project.muxID && !project.thumbnailUrl) {
-      firstSlot.className = 'col-span-2 w-full overflow-visible';
+      firstSlot.className = 'col-span-2 w-full h-auto aspect-video';
       firstSlot.innerHTML = `
         <mux-player
           playback-id="${project.muxID}"
-          class="w-full object-cover aspect-video"
+          class="w-full object-cover h-full"
           style="--controls: none"
           muted
           loop
@@ -725,10 +725,12 @@ const extendedProjects =
 
     if (project.muxID && !project.thumbnailUrl) {
       customElements.whenDefined('mux-player').then(() => {
-        setTimeout(() => {
+        const attach = () => {
           const player = firstSlot.querySelector('mux-player') as MuxPlayer | null;
           if (player) attachMuxControls(player);
-        }, 3000);
+        };
+        if (instant) attach();
+        else setTimeout(attach, 3000);
       });
     }
 
@@ -941,7 +943,7 @@ const extendedProjects =
         const galleryCovers = detailImageGallery!.querySelectorAll('.gallery-image-cover');
         gsap.fromTo(galleryCovers,
           { y: 0 },
-          { y: '100%', duration: 1.2, ease: "power3.out", stagger: 0.2, delay: 0.8 }
+          { y: '100%', duration: 1.2, ease: "power3.inOut", stagger: 0.2, delay: 0.8 }
         );
 
         for (let i = 0; i < allWrappers.length; i++) {
@@ -1085,7 +1087,7 @@ const extendedProjects =
       duration: DURATION_ALT * 0.5,
       ease: EASE,
       onComplete: () => {
-        populateProjectDetail(project);
+        populateProjectDetail(project, { instant: true });
 
         gsap.fromTo(detailImageGallery!.children,
           { opacity: 0, y: 10 },
@@ -1113,7 +1115,7 @@ const extendedProjects =
     activeRowIndex = -1;
     if (project.slug) history.replaceState(null, '', '#' + project.slug);
 
-    populateProjectDetail(project);
+    populateProjectDetail(project, { instant: true });
 
     // Remove gallery image covers immediately (no reveal animation)
     detailImageGallery!.querySelectorAll<HTMLElement>('.gallery-image-cover').forEach(c => c.remove());
@@ -1177,6 +1179,13 @@ const extendedProjects =
 
     if (!firstVisibleWrapper) return;
 
+    // Capture wrapper position at scrollY=0 so fillStart adapts to project height.
+    // For tall projects: fillStart = 2.2*vh (hint begins when project bottom exits viewport).
+    // For short projects: fillStart = initialWrapperTop - 1 (hint begins on first scroll px).
+    const initialWrapperTop = firstVisibleWrapper.getBoundingClientRect().top;
+    const fillStart = Math.min(initialWrapperTop - 1, window.innerHeight * 2);
+    const fillEnd   = window.innerHeight * 0.01;
+
     scrollObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (isProjectOpen && entry.boundingClientRect.top <= 0) {
@@ -1199,11 +1208,9 @@ const extendedProjects =
       }
       const scrollFill = document.getElementById('scroll-back-fill') as HTMLElement | null;
       const hintEl     = document.getElementById('scroll-back-hint') as HTMLElement | null;
-      const fillStart  = window.innerHeight * 3.5;
-      const fillEnd    = window.innerHeight * 0.1;
       const progress   = Math.max(0, Math.min(1, (fillStart - wrapperRect.top) / (fillStart - fillEnd)));
 
-      const REVEAL_START = 0.65;
+      const REVEAL_START = 0.35;
 
       if (scrollFill) {
         // Fill completes exactly when the cover starts sliding (REVEAL_START)
@@ -1806,7 +1813,6 @@ const extendedProjects =
 
   let activeMuxPlayer: MuxPlayer | null = null;
   const muxListeners: { [k: string]: (e?: any) => void } = {};
-  let muxResizeObserver: ResizeObserver | null = null;
 
   function fmtTime(s: number): string {
     if (!isFinite(s) || s < 0) return '00:00';
@@ -1827,50 +1833,32 @@ const extendedProjects =
     if (muxThumbEl) muxThumbEl.style.left = `${pct}%`;
   }
 
-  // Pin the controls bar to the active player's bottom edge using fixed
-  // positioning. Re-runs on resize and after metadata loads (in case the
-  // player resizes when its aspect ratio is known).
-  function positionMuxControls() {
-    if (!muxControls || !activeMuxPlayer) return;
-    const rect = activeMuxPlayer.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
-      requestAnimationFrame(positionMuxControls);
-      return;
-    }
-    muxControls.style.position = 'fixed';
-    muxControls.style.top      = '';
-    muxControls.style.right    = '';
-    muxControls.style.left     = `${rect.left}px`;
-    muxControls.style.width    = `${rect.width}px`;
-    muxControls.style.bottom   = `${window.innerHeight - rect.bottom}px`;
-  }
-
-  const onMuxControlsResize = () => positionMuxControls();
-
   function attachMuxControls(player: MuxPlayer) {
     detachMuxControls();
     activeMuxPlayer = player;
 
-    muxListeners.play     = () => syncMuxUI();
-    muxListeners.pause    = () => syncMuxUI();
-    muxListeners.timeupdate     = () => syncMuxUI();
-    muxListeners.loadedmetadata = () => { syncMuxUI(); positionMuxControls(); };
-    muxListeners.durationchange = () => syncMuxUI();
-    muxListeners.volumechange   = () => syncMuxUI();
+    muxListeners.play            = () => syncMuxUI();
+    muxListeners.pause           = () => syncMuxUI();
+    muxListeners.timeupdate      = () => syncMuxUI();
+    muxListeners.loadedmetadata  = () => syncMuxUI();
+    muxListeners.durationchange  = () => syncMuxUI();
+    muxListeners.volumechange    = () => syncMuxUI();
     for (const ev of Object.keys(muxListeners)) {
       player.addEventListener(ev, muxListeners[ev]);
     }
     syncMuxUI();
-    positionMuxControls();
-    window.addEventListener('resize', onMuxControlsResize);
 
-    // Reposition whenever the player reflows to its natural aspect-ratio height
-    if ('ResizeObserver' in window) {
-      muxResizeObserver = new ResizeObserver(() => positionMuxControls());
-      muxResizeObserver.observe(player);
-    }
-
-    if (muxControls) {
+    // Move controls inside the player's container so they scroll with it
+    if (muxControls && player.parentElement) {
+      const container = player.parentElement;
+      container.style.position = 'relative';
+      container.appendChild(muxControls);
+      muxControls.style.position   = 'absolute';
+      muxControls.style.bottom     = '0.3rem';
+      muxControls.style.left       = '0';
+      muxControls.style.right      = '0';
+      muxControls.style.width      = '';
+      muxControls.style.top        = '';
       muxControls.style.opacity    = '1';
       muxControls.style.visibility = 'visible';
     }
@@ -1882,20 +1870,15 @@ const extendedProjects =
         activeMuxPlayer.removeEventListener(ev, muxListeners[ev]);
       }
     }
-    muxResizeObserver?.disconnect();
-    muxResizeObserver = null;
     activeMuxPlayer = null;
-    window.removeEventListener('resize', onMuxControlsResize);
-    if (muxControls) {
+    if (muxControls && muxControlsHome) {
+      muxControlsHome.appendChild(muxControls);
       muxControls.style.opacity    = '0';
       muxControls.style.visibility = 'hidden';
-      // Clear fixed-position inline styles so a fresh attach starts clean.
-      muxControls.style.position = '';
-      muxControls.style.top      = '';
-      muxControls.style.left     = '';
-      muxControls.style.right    = '';
-      muxControls.style.bottom   = '';
-      muxControls.style.width    = '';
+      muxControls.style.position   = '';
+      muxControls.style.bottom     = '';
+      muxControls.style.left       = '';
+      muxControls.style.right      = '';
     }
   }
 

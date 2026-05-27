@@ -106,6 +106,8 @@ body {
 }
 
 mux-player {
+  display: block;
+
   /* Hide all controls at once */
   --controls: none;
 
