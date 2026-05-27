@@ -999,7 +999,7 @@ const extendedProjects =
     const anchorTop = anchorRect?.top ?? 0;
 
     isProjectOpen = false;
-    isAnimating = false;
+    isAnimating = true; // hold until layout + lenis settle to block mid-close hover updates
     currentProjectId = null;
     history.replaceState(null, '', location.pathname + location.search);
 
@@ -1024,14 +1024,19 @@ const extendedProjects =
     for (const wrapper of allWrappers) {
       wrapper.style.display = '';
       wrapper.style.visibility = '';
-      setWrapperYInstant(wrapper, 0);
+      wrapperYValues.set(wrapper, 0);
+      gsap.killTweensOf(wrapper, 'y');
+      gsap.set(wrapper, { y: 0 });
+      wrapperYQuickTo.set(wrapper, gsap.quickTo(wrapper, 'y', { duration: DURATION, ease: EASE }));
     }
 
-    // Reset flexGrow only for previously hidden rows (preserves visible animation state)
-    for (let i = 0; i < hiddenRowEnd; i++) {
-      const items = rowItemsCache.get(allRows[i]) || [];
+    // Reset flexGrow for all rows — kill in-flight tweens then recreate setters
+    for (const row of allRows) {
+      const items = rowItemsCache.get(row) || [];
       for (const item of items) {
+        gsap.killTweensOf(item, 'flexGrow');
         gsap.set(item, { flexGrow: 1 });
+        itemFlexQuickTo.set(item, gsap.quickTo(item, 'flexGrow', { duration: DURATION_ALT, ease: EASE }));
       }
     }
 
@@ -1071,7 +1076,10 @@ const extendedProjects =
       requestAnimationFrame(() => {
         lenis.start();
         lenis.scrollTo(window.scrollY, { immediate: true });
+        isAnimating = false;
       });
+    } else {
+      isAnimating = false;
     }
 
     // Reveal footer in case it was hidden on a deep-link load
@@ -1193,9 +1201,9 @@ const extendedProjects =
     if (fillElInit) fillElInit.style.clipPath = 'inset(0 100% 0 0)';
 
     const initialWrapperTop = firstVisibleWrapper.getBoundingClientRect().top;
-    const fillStart = Math.min(initialWrapperTop - 1, window.innerHeight * 2.2);
+    const fillStart = window.innerHeight * 2.2;
     // Close fires when gallery has scrolled 1.5*vh past viewport top — gives ~2x total scroll range.
-    const CLOSE_THRESHOLD = window.innerHeight * 0.2;
+    const CLOSE_THRESHOLD = window.innerHeight *0.3;
     const range = fillStart - CLOSE_THRESHOLD*0.2;
 
     // Phase fractions over [0=start scrolling, 1=close fires]
