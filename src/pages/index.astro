@@ -1204,13 +1204,13 @@ const extendedProjects =
     const fillStart = window.innerHeight * 2.2;
     // Close fires when gallery has scrolled 1.5*vh past viewport top — gives ~2x total scroll range.
     const CLOSE_THRESHOLD = window.innerHeight *0.3;
-    const range = fillStart - CLOSE_THRESHOLD*0.2;
+    const range = fillStart - CLOSE_THRESHOLD*0.8;
 
     // Phase fractions over [0=start scrolling, 1=close fires]
     const FADE_IN_START = 0.12; // hint starts appearing (delayed)
-    const FADE_IN_END   = 0.24; // hint fully opaque
-    const FILL_START_F  = 0.18; // fill begins
-    const FILL_END_F    = 0.60; // fill completes before gallery enters viewport (~progress 0.32)
+    const FADE_IN_END   = 0.5; // hint fully opaque
+    const FILL_START_F  = 0.5; // fill begins
+    const FILL_END_F    = 0.9; // fill completes before gallery enters viewport (~progress 0.32)
 
     scrollObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
@@ -1248,7 +1248,7 @@ const extendedProjects =
           (progress - FADE_IN_START) / (FADE_IN_END - FADE_IN_START)
         ));
         // Fade out as gallery scrolls up from the bottom into view
-        const FADE_OUT_END = window.innerHeight * 0.8;
+        const FADE_OUT_END = window.innerHeight * 0.5;
         const fadeOut = wrapperRect.top >= window.innerHeight
           ? 1
           : Math.max(0, (wrapperRect.top - FADE_OUT_END) / (window.innerHeight - FADE_OUT_END));
