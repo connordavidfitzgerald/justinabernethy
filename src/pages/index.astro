@@ -725,8 +725,10 @@ const extendedProjects =
 
     if (project.muxID && !project.thumbnailUrl) {
       customElements.whenDefined('mux-player').then(() => {
-        const player = firstSlot.querySelector('mux-player') as MuxPlayer | null;
-        if (player) attachMuxControls(player);
+        setTimeout(() => {
+          const player = firstSlot.querySelector('mux-player') as MuxPlayer | null;
+          if (player) attachMuxControls(player);
+        }, 30 00);
       });
     }
 
