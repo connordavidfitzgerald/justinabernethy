@@ -437,7 +437,7 @@ const extendedProjects =
     >
       <div
         id="mobile-overlay-media"
-        class="absolute inset-0 overflow-hidden opacity-0"
+        class="absolute inset-0 overflow-hidden opacity-0 z-1"
       >
         <div id="mobile-overlay-track" style="display: flex; height: 100%; will-change: transform;"></div>
       </div>
@@ -2399,10 +2399,12 @@ const extendedProjects =
         '<a href="mailto:info@justinabernethy.com" style="display:block;opacity:0.5;pointer-events:auto">info@justinabernethy.com</a>' +
         '<span style="display:flex;gap:2.5rem;padding-top:4rem;"><a href="https://www.instagram.com/nethyj/" style="pointer-events:auto">Instagram</a><a href="https://vimeo.com/user96868841" style="pointer-events:auto">Vimeo</a></span>';
       centerIndexEl.textContent = '000';
+      window.dispatchEvent(new CustomEvent('mobile-info-slide', { detail: { active: true } }));
       return;
     }
     centerNameEl.textContent  = project.name ?? '';
     centerIndexEl.textContent = String(project.index ?? '').padStart(3, '0');
+    window.dispatchEvent(new CustomEvent('mobile-info-slide', { detail: { active: false } }));
   }
 
   function goToVirtual(vi: number, animate = true): void {
@@ -2572,6 +2574,7 @@ const extendedProjects =
     });
   }
   init();
+  (window as any).__mobileGoNextSlide = () => goToVirtual(currentVirtualIndex + 1);
 
   // Open project if URL hash matches one on load
   const mobileDeepSlug = window.location.hash.slice(1);
