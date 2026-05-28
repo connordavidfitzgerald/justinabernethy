@@ -54,6 +54,19 @@ img {
   }
 }
 
+@media (orientation: landscape) and (max-width: 767px) {
+  /* Slider homepage: constrain portrait images by height in landscape */
+  #mobile-slider .slider-slide {
+    justify-content: center;
+  }
+  #mobile-slider .slider-slide > img,
+  #mobile-slider .slider-slide > div {
+    width: auto;
+    height: 85%;
+    max-width: 100%;
+  }
+}
+
 /* Light mode (default) */
 :root {
   --bg-primary: #ffffff;

@@ -2672,7 +2672,17 @@ const extendedProjects =
     muxControls.style.left     = `${rect.left}px`;
     muxControls.style.right    = `${window.innerWidth - rect.right}px`;
     muxControls.style.width    = '';
-    muxControls.style.bottom   = `${window.innerHeight - rect.bottom}px`;
+    muxControls.style.bottom   = `${window.innerHeight - rect.bottom - 10}px`;
+
+    const landscape = window.innerWidth > window.innerHeight;
+    if (overlayMetaLeft) {
+      overlayMetaLeft.style.visibility = landscape ? 'hidden' : '';
+      overlayMetaLeft.style.bottom     = landscape ? '' : '0.375rem';
+    }
+    if (overlayMetaRight) {
+      overlayMetaRight.style.visibility = landscape ? 'hidden' : '';
+      overlayMetaRight.style.bottom     = landscape ? '' : '0.375rem';
+    }
   }
 
   function attachMuxControls(player: MobileMuxPlayer) {
@@ -2696,9 +2706,6 @@ const extendedProjects =
       muxControls.style.opacity    = '1';
       muxControls.style.visibility = 'visible';
     }
-    // Shift meta labels above the mux controls bar instead of hiding them.
-    if (overlayMetaLeft)  overlayMetaLeft.style.bottom  = '0.375rem';
-    if (overlayMetaRight) overlayMetaRight.style.bottom = '0.375rem';
   }
 
   function detachMuxControls() {
@@ -2719,8 +2726,8 @@ const extendedProjects =
       muxControls.style.right      = '';
       muxControls.style.width      = '';
     }
-    if (overlayMetaLeft)  overlayMetaLeft.style.bottom  = '';
-    if (overlayMetaRight) overlayMetaRight.style.bottom = '';
+    if (overlayMetaLeft)  { overlayMetaLeft.style.bottom = '';  overlayMetaLeft.style.visibility = ''; }
+    if (overlayMetaRight) { overlayMetaRight.style.bottom = ''; overlayMetaRight.style.visibility = ''; }
   }
 
   // Static control handlers — read activeMuxPlayer at click time.
