@@ -904,7 +904,7 @@ const extendedProjects =
       savedMaxDelta = deltas.length > 0 ? Math.max(...deltas) : 0;
 
       setWrapperYInstant(container as any, 0); // container isn't a wrapper but harmless to track
-      gsap.set(container, { y: 0, marginTop: window.innerHeight * 1.2 });
+      gsap.set(container, { y: 0, marginTop: window.innerHeight * 2.3 + 200 });
 
       container.parentElement?.insertBefore(projectDetail, container);
 
@@ -1155,7 +1155,7 @@ const extendedProjects =
     }
 
     // Position gallery container below the project detail (out of initial viewport)
-    gsap.set(container, { y: 0, marginTop: window.innerHeight * 1.2, opacity: 1 });
+    gsap.set(container, { y: 0, marginTop: window.innerHeight * 2.3 +200, opacity: 1 });
 
     // Insert detail before gallery and reveal it
     container.parentElement?.insertBefore(projectDetail, container);
@@ -1201,16 +1201,16 @@ const extendedProjects =
     if (fillElInit) fillElInit.style.clipPath = 'inset(0 100% 0 0)';
 
     const initialWrapperTop = firstVisibleWrapper.getBoundingClientRect().top;
-    const fillStart = window.innerHeight * 2.2;
+    const fillStart = window.innerHeight * 2.3;
     // Close fires when gallery has scrolled 1.5*vh past viewport top — gives ~2x total scroll range.
     const CLOSE_THRESHOLD = window.innerHeight *0.3;
-    const range = fillStart - CLOSE_THRESHOLD*0.8;
+    const range = fillStart + 200;
 
     // Phase fractions over [0=start scrolling, 1=close fires]
-    const FADE_IN_START = 0.12; // hint starts appearing (delayed)
-    const FADE_IN_END   = 0.5; // hint fully opaque
-    const FILL_START_F  = 0.5; // fill begins
-    const FILL_END_F    = 0.9; // fill completes before gallery enters viewport (~progress 0.32)
+    const FADE_IN_START = 0; // hint starts appearing (delayed)
+    const FADE_IN_END   = 0.4; // hint fully opaque
+    const FILL_START_F  = 0.1; // fill begins
+    const FILL_END_F    = 0.6; // fill completes before gallery enters viewport (~progress 0.32)
 
     scrollObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
@@ -1248,7 +1248,7 @@ const extendedProjects =
           (progress - FADE_IN_START) / (FADE_IN_END - FADE_IN_START)
         ));
         // Fade out as gallery scrolls up from the bottom into view
-        const FADE_OUT_END = window.innerHeight * 0.5;
+        const FADE_OUT_END = window.innerHeight *0.7;
         const fadeOut = wrapperRect.top >= window.innerHeight
           ? 1
           : Math.max(0, (wrapperRect.top - FADE_OUT_END) / (window.innerHeight - FADE_OUT_END));
