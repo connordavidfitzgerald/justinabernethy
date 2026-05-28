@@ -31,25 +31,14 @@ const { thumbnails } = Astro.props;
         style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); white-space: nowrap; line-height: 1; visibility: hidden; z-index: 1;"
     >Justin Abernethy</p>
 
-    <p
-        id="preloader-progress"
-        class="absolute font-normal text-md tracking-custom uppercase text-center hidden"
-        style="bottom: 60px;"
-    >
-        0%
-    </p>
+
 </div>
 
 <script define:vars={{ thumbnails }}>
 (function () {
     'use strict';
 
-    // Desktop only (md breakpoint = 768px)
-    if (!matchMedia('(min-width: 768px)').matches) {
-        var el = document.getElementById('preloader');
-        if (el) el.remove();
-        return;
-    }
+    var isMobile = !matchMedia('(min-width: 768px)').matches;
 
     // Skip preloader for direct project links so the target opens immediately
     if (location.hash.length > 1) {
@@ -66,8 +55,10 @@ const { thumbnails } = Astro.props;
     }
     sessionStorage.setItem('preloader-shown', '1');
 
-    // Signal to gallery init() that the preloader is handling the reveal
-    window.__PRELOADER_ACTIVE__ = true;
+    // Signal to gallery init() that the preloader is handling the reveal (desktop only)
+    if (!isMobile) {
+        window.__PRELOADER_ACTIVE__ = true;
+    }
 
     // ─── New-preloader timing constants ──────────────────────────────────────
 
@@ -155,7 +146,7 @@ const { thumbnails } = Astro.props;
         var nameEl      = document.getElementById('preloader-name');
         nameEl.style.visibility = 'visible';
         var containerEl = document.getElementById('preloader-img-container');
-        var progressEl  = document.getElementById('preloader-progress');
+
         var preloader   = document.getElementById('preloader');
 
         var COVER_DUR = 0.45;
@@ -184,14 +175,17 @@ const { thumbnails } = Astro.props;
                 preloader.style.transition = 'opacity 0.4s ease-out';
                 preloader.style.opacity    = '0';
                 preloader.addEventListener('transitionend', function () {
-                    oldAnimDone = true;
-                    maybeStartNewPreloader();
+                    if (isMobile) {
+                        preloader.remove();
+                    } else {
+                        oldAnimDone = true;
+                        maybeStartNewPreloader();
+                    }
                 }, { once: true });
             }
         });
 
-        // Hide progress counter instantly
-        tl.set(progressEl, { autoAlpha: 0 }, 0);
+
 
         // Close image container via clip-path — no opacity change on the image
         tl.fromTo(containerEl,
@@ -211,8 +205,14 @@ const { thumbnails } = Astro.props;
 
     function runOldAnimation() {
         var imgEl      = document.getElementById('preloader-img');
-        var progressEl = document.getElementById('preloader-progress');
-        if (!imgEl || !progressEl) { oldAnimDone = true; maybeStartNewPreloader(); return; }
+
+        if (!imgEl) {
+            if (isMobile) { var el = document.getElementById('preloader'); if (el) el.remove(); }
+            else { oldAnimDone = true; maybeStartNewPreloader(); }
+            return;
+        }
+
+
 
         var total = thumbnails.length;
         var start = performance.now();
@@ -221,7 +221,7 @@ const { thumbnails } = Astro.props;
             var elapsed  = Math.min(now - start, OLD_ANIM_DURATION);
             var progress = expoInOut(elapsed / OLD_ANIM_DURATION);
 
-            progressEl.textContent = Math.round(progress * 100) + '%';
+
             imgEl.src = thumbnails[Math.min(Math.floor(progress * total), total - 1)];
             imgEl.style.visibility = 'visible';
 
@@ -238,7 +238,12 @@ const { thumbnails } = Astro.props;
     // Preload all thumbnails then start old animation.
     // If no thumbnails, skip straight to the gate.
     if (thumbnails.length === 0) {
-        oldAnimDone = true;
+        if (isMobile) {
+            var el = document.getElementById('preloader');
+            if (el) el.remove();
+        } else {
+            oldAnimDone = true;
+        }
     } else {
         var loadedCount = 0;
         thumbnails.forEach(function (url) {
@@ -337,7 +342,7 @@ const { thumbnails } = Astro.props;
 
     // ─── Gallery-layout-ready: set up covers + hide names/nav ────────────────
 
-    window.addEventListener('gallery-layout-ready', function () {
+    if (!isMobile) window.addEventListener('gallery-layout-ready', function () {
         capturedItems = Array.from(document.querySelectorAll('.gallery-item'));
 
         document.body.style.overflow = 'hidden';
@@ -384,7 +389,7 @@ const { thumbnails } = Astro.props;
     setTimeout(function () {
         var preloader = document.getElementById('preloader');
         if (preloader) preloader.remove();
-        window.__PRELOADER_ACTIVE__ = false;
+        if (!isMobile) window.__PRELOADER_ACTIVE__ = false;
         document.body.style.overflow = '';
     }, 15000);
 

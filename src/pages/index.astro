@@ -372,6 +372,7 @@ const extendedProjects =
       <div
         id="slider-track"
         class="absolute left-0 right-0 flex flex-col"
+        style="visibility: hidden;"
       >
         {extendedProjects.map((project: any, i: number) => {
           const isCloneFirst = i === 0;
@@ -422,7 +423,7 @@ const extendedProjects =
         id="center-info"
         class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-start text-white mix-blend-difference uppercase tracking-custom text-sm font-normal pointer-events-none z-10000"
       >
-        <div id="center-name" class="leading-[110%]"></div>
+        <div id="center-name" class="leading-[110%] w-[75%]"></div>
         <span id="center-index" class="leading-[110%]"></span>
 
 
@@ -454,7 +455,7 @@ const extendedProjects =
 
       <button
         id="mobile-overlay-close"
-        class="absolute top-8 left-2 z-30 uppercase tracking-custom text-sm font-normal opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none"
+        class="absolute top-12 left-2 z-30 uppercase tracking-custom text-sm font-normal opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none"
       >Exit</button>
 
       <div
@@ -475,7 +476,7 @@ const extendedProjects =
       <!-- Mux custom controls (visible only on mobile-overlay videos) -->
       <div
         id="mobile-overlay-mux-controls"
-        class="absolute bottom-0 left-0 right-0 z-40 px-padding py-padding flex flex-row justify-between items-center gap-4 text-white mix-blend-difference text-sm uppercase tracking-custom font-normal opacity-0 pointer-events-none transition-opacity duration-200"
+        class="absolute bottom-0 left-0 right-0 z-40 px-padding py-padding flex flex-row justify-between items-center gap-4 text-white mix-blend-difference text-sm uppercase tracking-custom font-normal opacity-0 pointer-events-auto transition-opacity duration-200"
         style="visibility: hidden;"
       >
         <div class="flex flex-row gap-4 pointer-events-auto items-center">
@@ -2567,6 +2568,7 @@ const extendedProjects =
       sizeSlides();
       goToVirtual(1, false);
       updateInfoText(1);
+      track.style.visibility = '';
     });
   }
   init();
@@ -2621,7 +2623,8 @@ const extendedProjects =
     requestFullscreen?: () => Promise<void>;
   };
 
-  const muxControls    = document.getElementById('mobile-overlay-mux-controls');
+  const muxControls     = document.getElementById('mobile-overlay-mux-controls');
+  const muxControlsHome = muxControls?.parentElement ?? null; // original DOM parent to return to on detach
   const muxPlayPauseEl  = muxControls?.querySelector('[data-mux-ctl="playpause"]')  as HTMLElement | null;
   const muxMuteEl       = muxControls?.querySelector('[data-mux-ctl="mute"]')       as HTMLElement | null;
   const muxFullscreenEl = muxControls?.querySelector('[data-mux-ctl="fullscreen"]') as HTMLElement | null;
@@ -2652,6 +2655,8 @@ const extendedProjects =
     if (muxThumbEl) muxThumbEl.style.left = `${pct}%`;
   }
 
+  // Position controls over the active player using viewport coords.
+  // overlay is fixed inset-0, so viewport coords equal overlay-relative coords.
   function positionMuxControls() {
     if (!muxControls || !activeMuxPlayer) return;
     const rect = activeMuxPlayer.getBoundingClientRect();
@@ -2659,15 +2664,13 @@ const extendedProjects =
       requestAnimationFrame(positionMuxControls);
       return;
     }
-    muxControls.style.position = 'fixed';
+    muxControls.style.position = 'absolute';
     muxControls.style.top      = '';
-    muxControls.style.right    = '';
     muxControls.style.left     = `${rect.left}px`;
-    muxControls.style.width    = `${rect.width}px`;
+    muxControls.style.right    = `${window.innerWidth - rect.right}px`;
+    muxControls.style.width    = '';
     muxControls.style.bottom   = `${window.innerHeight - rect.bottom}px`;
   }
-
-  const onMuxControlsResize = () => positionMuxControls();
 
   function attachMuxControls(player: MobileMuxPlayer) {
     detachMuxControls();
@@ -2676,7 +2679,7 @@ const extendedProjects =
     muxListeners.play           = () => syncMuxUI();
     muxListeners.pause          = () => syncMuxUI();
     muxListeners.timeupdate     = () => syncMuxUI();
-    muxListeners.loadedmetadata = () => { syncMuxUI(); positionMuxControls(); };
+    muxListeners.loadedmetadata = () => syncMuxUI();
     muxListeners.durationchange = () => syncMuxUI();
     muxListeners.volumechange   = () => syncMuxUI();
     for (const ev of Object.keys(muxListeners)) {
@@ -2684,7 +2687,7 @@ const extendedProjects =
     }
     syncMuxUI();
     positionMuxControls();
-    window.addEventListener('resize', onMuxControlsResize);
+    window.addEventListener('resize', positionMuxControls);
 
     if (muxControls) {
       muxControls.style.opacity    = '1';
@@ -2702,16 +2705,16 @@ const extendedProjects =
       }
     }
     activeMuxPlayer = null;
-    window.removeEventListener('resize', onMuxControlsResize);
+    window.removeEventListener('resize', positionMuxControls);
     if (muxControls) {
       muxControls.style.opacity    = '0';
       muxControls.style.visibility = 'hidden';
-      muxControls.style.position = '';
-      muxControls.style.top      = '';
-      muxControls.style.left     = '';
-      muxControls.style.right    = '';
-      muxControls.style.bottom   = '';
-      muxControls.style.width    = '';
+      muxControls.style.position   = '';
+      muxControls.style.top        = '';
+      muxControls.style.bottom     = '';
+      muxControls.style.left       = '';
+      muxControls.style.right      = '';
+      muxControls.style.width      = '';
     }
     if (overlayMetaLeft)  overlayMetaLeft.style.visibility  = '';
     if (overlayMetaRight) overlayMetaRight.style.visibility = '';
@@ -2733,23 +2736,35 @@ const extendedProjects =
     e.stopPropagation();
     if (!activeMuxPlayer) return;
 
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
+    if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+      (document.exitFullscreen?.() ?? (document as any).webkitExitFullscreen?.());
       return;
     }
 
-    // Fullscreen the entire mobile overlay rather than the mux-player itself.
-    // Reason: when you fullscreen the <mux-player> host element, only that
-    // host renders — our sibling controls bar vanishes — and media-chrome's
-    // internal fullscreen state machine can race against the request and
-    // dispatch an immediate `exitFullscreen()`. Fullscreening the overlay
-    // wrapper keeps the player AND controls visible and avoids the race.
     const target: any = overlayEl;
-    const reqFs = target?.requestFullscreen?.bind(target)
-               // iOS Safari only allows fullscreen on <video>; fall back to
-               // mux-player's webkitEnterFullscreen on the underlying video.
-               ?? (activeMuxPlayer as any).webkitEnterFullscreen?.bind(activeMuxPlayer);
-    reqFs?.()?.catch?.(() => {});
+
+    // iOS Safari does not support requestFullscreen on arbitrary elements.
+    // media-chrome exposes the underlying <video> via player.media; call
+    // webkitEnterFullscreen() on it as the iOS fallback.
+    const getVideoEl = () => (activeMuxPlayer as any).media as HTMLVideoElement | null;
+
+    const tryVideoFallback = () => {
+      const video = getVideoEl();
+      if (!video) return;
+      if ((video as any).webkitEnterFullscreen) {
+        (video as any).webkitEnterFullscreen();
+      } else if (video.requestFullscreen) {
+        video.requestFullscreen().catch(() => {});
+      }
+    };
+
+    if (target.requestFullscreen) {
+      target.requestFullscreen().catch(tryVideoFallback);
+    } else if ((target as any).webkitRequestFullscreen) {
+      (target as any).webkitRequestFullscreen();
+    } else {
+      tryVideoFallback();
+    }
   });
 
   let muxScrubbing = false;
@@ -2872,6 +2887,7 @@ const extendedProjects =
           overlayAnimating = false;
           if (vi === 0)     goToOverlayVirtual(m, false);
           if (vi === m + 1) goToOverlayVirtual(1, false);
+          positionMuxControls();
         },
       });
     } else {

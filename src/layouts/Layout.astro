@@ -59,7 +59,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
                     </div>
                 </div>
                 <div style="overflow: hidden; position: relative;">
-                    <a id="nav-info" href="/information" class="block">
+                    <a id="nav-info" class="block">
                         <span id="nav-info-label" style="display: block;">Information</span>
                     </a>
                     <span id="nav-info-close" class="cursor-pointer" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap; visibility: hidden;">Close</span>
@@ -121,6 +121,26 @@ const FONTS: CssVariable[] = ["--font-sans"];
                                 alt="Justin Abernethy headshot"
                                 class="w-full aspect-5/7 max-h-screen object-cover"
                             />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mobile layout (matches /information page) -->
+                <div class="md:hidden flex flex-col h-screen justify-end p-padding text-sm leading-[110%]">
+                    <div class="flex flex-col h-fit justify-center shrink pb-12">
+                        <div class="flex flex-row items-start justify-start">
+                            <p class="text-nowrap pb-10">
+                                Director and Photographer Based in Toronto.<br/><span class="opacity-muted text-nowrap cursor-pointer">info@justinabernethy.com</span>
+                            </p>
+                        </div>
+                        <div class="grid grid-cols-10 gap-gutter">
+                            <a href="https://www.instagram.com/nethyj/" class="col-span-3 flex flex-row justify-start items-start hover:opacity-muted cursor-pointer">Instagram</a>
+                            <a href="https://vimeo.com/user96868841" class="col-span-3 flex flex-row justify-start items-start hover:opacity-muted cursor-pointer">Vimeo</a>
+                        </div>
+                    </div>
+                    <div class="flex flex-row justify-end items-end h-fit overflow-hidden mb-[0.375rem]!">
+                        <div class="w-full aspect-5/7 flex">
+                            <Picture src={headshot} alt="Justin Abernethy headshot" class="w-full h-full object-cover" />
                         </div>
                     </div>
                 </div>
@@ -247,8 +267,8 @@ const FONTS: CssVariable[] = ["--font-sans"];
 
 
             navInfo.addEventListener('click', (e: MouseEvent) => {
+                e.preventDefault();
                 if (window.innerWidth >= 768) {
-                    e.preventDefault();
                     if (footerVisible) {
                         ((window as any).lenis ?? window).scrollTo(0, { duration: 2.4, easing: (t: number) => 1 - Math.pow(1 - t, 10) });
                     } else if (overlayOpen) {
@@ -256,12 +276,14 @@ const FONTS: CssVariable[] = ["--font-sans"];
                     } else {
                         openInfo();
                     }
+                } else {
+                    if (overlayOpen) closeInfo();
+                    else openInfo();
                 }
-                // mobile: falls through to normal /information navigation
             });
 
             navInfoClose.addEventListener('click', () => {
-                if (window.innerWidth >= 768) closeInfo();
+                closeInfo();
             });
 
             navInfoScrollTop.addEventListener('click', () => {
