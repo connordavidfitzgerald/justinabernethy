@@ -341,7 +341,7 @@ const extendedProjects =
             <div class="flex flex-col gap-padding w-full h-fit min-[1350px]:grid min-[1350px]:grid-cols-5 min-[1350px]:gap-gutter">
                 <div class="min-[1350px]:col-span-3! flex flex-row items-start justify-start">
                     <p class="text-nowrap">
-                        Director and Photographer Based in Toronto.<br/><span id="email"class="opacity-muted text-nowrap cursor-pointer">info@justinabernethy.com</span>
+                        Director and Photographer Based in Toronto.<br/><a id="email" href="mailto:info@justinabernethy.com" class="opacity-muted text-nowrap cursor-pointer">info@justinabernethy.com</a>
                     </p>
                 </div>
                 <div class="min-[1350px]:pt-0 pt-10 flex flex-row gap-10 min-[1350px]:gap-padding min-[1350px]:contents ">
@@ -2396,8 +2396,8 @@ const extendedProjects =
     if (project._id === '__info__') {
       centerNameEl.innerHTML =
         '<span style="display:block">Director and Photographer from Toronto.</span>' +
-        '<span style="display:block;opacity:0.5">info@justinabernethy.com</span>' +
-        '<span style="display:flex;gap:2.5rem;padding-top:4rem;">Instagram<span>Vimeo</span></span>';
+        '<a href="mailto:info@justinabernethy.com" style="display:block;opacity:0.5">info@justinabernethy.com</a>' +
+        '<span style="display:flex;gap:2.5rem;padding-top:4rem;"><a href="https://www.instagram.com/justinabernethy/">Instagram</a><a href="https://www.vimeo.com/justinabernethy">Vimeo</a></span>';
       centerIndexEl.textContent = '000';
       return;
     }
