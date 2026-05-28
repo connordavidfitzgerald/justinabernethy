@@ -2693,9 +2693,9 @@ const extendedProjects =
       muxControls.style.opacity    = '1';
       muxControls.style.visibility = 'visible';
     }
-    // Hide the static project meta labels — controls take their place.
-    if (overlayMetaLeft)  overlayMetaLeft.style.visibility  = 'hidden';
-    if (overlayMetaRight) overlayMetaRight.style.visibility = 'hidden';
+    // Shift meta labels above the mux controls bar instead of hiding them.
+    if (overlayMetaLeft)  overlayMetaLeft.style.bottom  = '0.375rem';
+    if (overlayMetaRight) overlayMetaRight.style.bottom = '0.375rem';
   }
 
   function detachMuxControls() {
@@ -2716,8 +2716,8 @@ const extendedProjects =
       muxControls.style.right      = '';
       muxControls.style.width      = '';
     }
-    if (overlayMetaLeft)  overlayMetaLeft.style.visibility  = '';
-    if (overlayMetaRight) overlayMetaRight.style.visibility = '';
+    if (overlayMetaLeft)  overlayMetaLeft.style.bottom  = '';
+    if (overlayMetaRight) overlayMetaRight.style.bottom = '';
   }
 
   // Static control handlers — read activeMuxPlayer at click time.
