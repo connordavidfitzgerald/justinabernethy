@@ -72,7 +72,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
         <div
             id="info-overlay"
             style="position: fixed; inset: 0; z-index: 10000; pointer-events: none;"
-            class="min-h-220 "
+            class=""
         >
             <div
                 id="info-panel"
@@ -125,28 +125,31 @@ const FONTS: CssVariable[] = ["--font-sans"];
                     </div>
                 </div>
 
-                <!-- Mobile layout (matches info slide in the slider) -->
-                <div class="md:hidden relative h-screen px-padding">
-                    <!-- Headshot: same layout as slider-slide (flex items-center px-10) -->
-                    <div class="h-full flex items-center px-10 pb-[2.5rem]">
-                        <Picture
-                            src={headshot}
-                            alt="Justin Abernethy headshot"
-                            class="w-full object-cover block"
-                            style="aspect-ratio: 5/7;"
-                        />
-                    </div>
-                    <!-- Text: same position + styling as center-info in the slider -->
-                    <div class="absolute left-0 right-0 px-padding flex flex-row justify-between items-start text-white mix-blend-difference uppercase tracking-custom text-sm font-normal leading-[110%] pointer-events-none" style="top: calc(50% - (var(--spacing-padding) * 3.25))">
-                        <div>
-                            <span style="display:block">Director and Photographer from Toronto.</span>
-                            <span style="display:block;opacity:0.5">info@justinabernethy.com</span>
-                            <span style="display:flex;gap:2.5rem;padding-top:4rem;" class="pointer-events-auto">
-                                <a href="https://www.instagram.com/nethyj/">Instagram</a>
-                                <a href="https://vimeo.com/user96868841">Vimeo</a>
-                            </span>
+                <!-- Mobile layout: exact same structure as the slider with project 00 -->
+                <div class="md:hidden h-full p-padding overflow-hidden">
+                    <!-- matches #mobile-slider: h-full relative, acts as positioning context -->
+                    <div class="h-full w-full relative">
+                        <!-- matches .slider-slide: h-full flex items-center px-10 -->
+                        <div class="h-full flex items-center px-10">
+                            <Picture
+                                src={headshot}
+                                alt="Justin Abernethy headshot"
+                                class="w-full object-cover block"
+                                style="aspect-ratio: 5/7;"
+                            />
                         </div>
-                        <span>000</span>
+                        <!-- matches #center-info: absolute top-1/2 left-0 right-0 -->
+                        <div class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-start text-white mix-blend-difference uppercase tracking-custom text-sm font-normal pointer-events-none">
+                            <div class="leading-[110%] w-[75%]">
+                                <span style="display:block">Director and Photographer from Toronto.</span>
+                                <a href="mailto:info@justinabernethy.com" style="display:block;opacity:0.5;pointer-events:auto">info@justinabernethy.com</a>
+                                <span style="display:flex;gap:2.5rem;padding-top:4rem;">
+                                    <a href="https://www.instagram.com/nethyj/" style="pointer-events:auto">Instagram</a>
+                                    <a href="https://vimeo.com/user96868841" style="pointer-events:auto">Vimeo</a>
+                                </span>
+                            </div>
+                            <span class="leading-[110%]">000</span>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -421,7 +421,7 @@ const extendedProjects =
 
       <div
         id="center-info"
-        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-start text-white mix-blend-difference uppercase tracking-custom text-sm font-normal pointer-events-none z-10000"
+        class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-start text-white mix-blend-difference uppercase tracking-custom text-sm font-normal z-10000"
       >
         <div id="center-name" class="leading-[110%] w-[75%]"></div>
         <span id="center-index" class="leading-[110%]"></span>
@@ -455,7 +455,7 @@ const extendedProjects =
 
       <button
         id="mobile-overlay-close"
-        class="absolute top-12 left-2 z-30 uppercase tracking-custom text-sm font-normal opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none"
+        class="absolute top-12 left-2 z-50 uppercase tracking-custom text-sm font-normal opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none p-3 -m-3"
       >Exit</button>
 
       <div
@@ -2396,8 +2396,8 @@ const extendedProjects =
     if (project._id === '__info__') {
       centerNameEl.innerHTML =
         '<span style="display:block">Director and Photographer from Toronto.</span>' +
-        '<a href="mailto:info@justinabernethy.com" style="display:block;opacity:0.5">info@justinabernethy.com</a>' +
-        '<span style="display:flex;gap:2.5rem;padding-top:4rem;"><a href="https://www.instagram.com/justinabernethy/">Instagram</a><a href="https://www.vimeo.com/justinabernethy">Vimeo</a></span>';
+        '<a href="mailto:info@justinabernethy.com" style="display:block;opacity:0.5;pointer-events:auto">info@justinabernethy.com</a>' +
+        '<span style="display:flex;gap:2.5rem;padding-top:4rem;"><a href="https://www.instagram.com/nethyj/" style="pointer-events:auto">Instagram</a><a href="https://vimeo.com/user96868841" style="pointer-events:auto">Vimeo</a></span>';
       centerIndexEl.textContent = '000';
       return;
     }
