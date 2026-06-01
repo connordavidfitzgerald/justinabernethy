@@ -2954,8 +2954,13 @@ const extendedProjects =
     const m = overlayItems.length;
     if (m === 0) return;
 
-    // Extended: [clone-of-last, ...real-items, clone-of-first]
-    const extended = [overlayItems[m - 1], ...overlayItems, overlayItems[0]];
+    // With more than one asset, pad with clones for a seamless loop:
+    // [clone-of-last, ...real-items, clone-of-first]. With a single asset there
+    // is nothing to loop — render just the one slide so it can't be scrolled and
+    // we don't spin up duplicate video players.
+    const extended = m > 1
+      ? [overlayItems[m - 1], ...overlayItems, overlayItems[0]]
+      : [overlayItems[0]];
 
     extended.forEach((item) => {
       const slide = document.createElement('div');
@@ -2996,6 +3001,31 @@ const extendedProjects =
 
   let overlayAnimating = false;
 
+  // Only loop (and allow navigation) when there's more than one asset.
+  function overlayLoop(): boolean {
+    return overlayItems.length > 1;
+  }
+
+  // Seamless-loop normalisation for the overlay track, mirroring the homepage
+  // slider. The track has a clone of the last asset before the first (index 0)
+  // and a clone of the first after the last (index m+1). When we land on a
+  // clone, shift the index by one loop (±m) and the track X by ∓m·width at once
+  // — identical content, so pixel-for-pixel invisible — bringing the index back
+  // into [1..m]. Run at the start of every gesture so an interrupted wrap can't
+  // strand the index on a clone and let a fast swipe walk it negative.
+  function normalizeOverlayLoop(): void {
+    const m = overlayItems.length;
+    if (m <= 1) return;
+    const w = overlayMediaEl.offsetWidth;
+    if (overlayVirtual <= 0) {
+      overlayVirtual += m;
+      gsap.set(overlayTrackEl, { x: (gsap.getProperty(overlayTrackEl, 'x') as number) - m * w });
+    } else if (overlayVirtual >= m + 1) {
+      overlayVirtual -= m;
+      gsap.set(overlayTrackEl, { x: (gsap.getProperty(overlayTrackEl, 'x') as number) + m * w });
+    }
+  }
+
   function goToOverlayVirtual(vi: number, animate = true): void {
     const m = overlayItems.length;
     if (m === 0) return;
@@ -3033,8 +3063,10 @@ const extendedProjects =
         ease: 'expo.out',
         onComplete: () => {
           overlayAnimating = false;
-          if (vi === 0)     goToOverlayVirtual(m, false);
-          if (vi === m + 1) goToOverlayVirtual(1, false);
+          if (overlayLoop()) {
+            if (vi === 0)     goToOverlayVirtual(m, false);
+            if (vi === m + 1) goToOverlayVirtual(1, false);
+          }
           positionMuxControls();
         },
       });
@@ -3060,9 +3092,9 @@ const extendedProjects =
     overlayEl.classList.remove('hidden');
     void overlayEl.offsetHeight;
 
-    overlayVirtual = 1;
+    overlayVirtual = overlayItems.length > 1 ? 1 : 0;
     buildOverlayTrack();
-    goToOverlayVirtual(1, false);
+    goToOverlayVirtual(overlayVirtual, false);
 
     overlayOpen = true;
     overlayEl.style.pointerEvents = 'auto';
@@ -3110,8 +3142,8 @@ const extendedProjects =
   document.addEventListener('keydown', (e) => {
     if (!overlayOpen) return;
     if      (e.key === 'Escape')     { e.preventDefault(); closeMobileOverlay(); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); overlayNext();        }
-    else if (e.key === 'ArrowLeft')  { e.preventDefault(); overlayPrev();        }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); if (overlayLoop() && !overlayAnimating) goToOverlayVirtual(overlayVirtual + 1); }
+    else if (e.key === 'ArrowLeft')  { e.preventDefault(); if (overlayLoop() && !overlayAnimating) goToOverlayVirtual(overlayVirtual - 1); }
   });
 
   // ── Drag / swipe for overlay track ───────────────────────────────────────
@@ -3127,17 +3159,19 @@ const extendedProjects =
   overlayEl.addEventListener('touchstart', (e: TouchEvent) => {
     if (!overlayOpen) return;
     if (muxControls?.contains(e.target as Node)) return;
+    gsap.killTweensOf(overlayTrackEl);
+    overlayAnimating = false;
+    normalizeOverlayLoop();          // recover the index if a wrap reset was interrupted
     overlayDragStartX    = e.touches[0].clientX;
     overlayDragStartY    = e.touches[0].clientY;
     overlayDragStartTime = performance.now();
     overlayDragStartTX   = gsap.getProperty(overlayTrackEl, 'x') as number;
     overlayDragging      = true;
-    gsap.killTweensOf(overlayTrackEl);
-    overlayAnimating = false;
   }, { passive: true });
 
   overlayEl.addEventListener('touchmove', (e: TouchEvent) => {
     if (!overlayDragging || !overlayOpen) return;
+    if (!overlayLoop()) return;      // single asset: nothing to scroll
     const dx = e.touches[0].clientX - overlayDragStartX;
     const dy = e.touches[0].clientY - overlayDragStartY;
     // Only take over once horizontal movement dominates
@@ -3161,7 +3195,7 @@ const extendedProjects =
       return;
     }
 
-    if (Math.abs(dx) > Math.abs(dy)) {
+    if (overlayLoop() && Math.abs(dx) > Math.abs(dy)) {
       if      (dx < -OVERLAY_SNAP_THRESHOLD) goToOverlayVirtual(overlayVirtual + 1);
       else if (dx >  OVERLAY_SNAP_THRESHOLD) goToOverlayVirtual(overlayVirtual - 1);
       else                                   goToOverlayVirtual(overlayVirtual);
