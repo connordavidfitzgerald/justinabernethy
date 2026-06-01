@@ -442,16 +442,7 @@ const extendedProjects =
         <div id="mobile-overlay-track" style="display: flex; height: 100%; will-change: transform;"></div>
       </div>
 
-      <button
-        id="mobile-overlay-prev-zone"
-        class="absolute top-0 bottom-0 left-0 w-1/2 z-20 bg-transparent appearance-none border-0 outline-none"
-        aria-label="Previous image"
-      ></button>
-      <button
-        id="mobile-overlay-next-zone"
-        class="absolute top-0 bottom-0 right-0 w-1/2 z-20 bg-transparent appearance-none border-0 outline-none"
-        aria-label="Next image"
-      ></button>
+
 
       <button
         id="mobile-overlay-close"
@@ -2673,8 +2664,7 @@ const extendedProjects =
   const overlayCountEl  = document.getElementById('mobile-overlay-counter')   as HTMLElement;
   const overlayMetaLeft  = document.getElementById('mobile-overlay-meta-left')  as HTMLElement;
   const overlayMetaRight = document.getElementById('mobile-overlay-meta-right') as HTMLElement;
-  const overlayPrevZone = document.getElementById('mobile-overlay-prev-zone') as HTMLElement;
-  const overlayNextZone = document.getElementById('mobile-overlay-next-zone') as HTMLElement;
+
   const overlayCloseBtn = document.getElementById('mobile-overlay-close')     as HTMLElement;
 
   // ── Mux custom controls (mobile project view) ────────────────────────────
@@ -3068,18 +3058,6 @@ const extendedProjects =
     });
   }
 
-  function overlayNext(): void {
-    if (!overlayOpen || overlayAnimating) return;
-    goToOverlayVirtual(overlayVirtual + 1);
-  }
-
-  function overlayPrev(): void {
-    if (!overlayOpen || overlayAnimating) return;
-    goToOverlayVirtual(overlayVirtual - 1);
-  }
-
-  overlayPrevZone.addEventListener('click', (e) => { e.preventDefault(); overlayPrev(); });
-  overlayNextZone.addEventListener('click', (e) => { e.preventDefault(); overlayNext(); });
   overlayCloseBtn.addEventListener('click', (e) => { e.preventDefault(); closeMobileOverlay(); });
 
   document.addEventListener('keydown', (e) => {
