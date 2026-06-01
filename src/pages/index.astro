@@ -2374,11 +2374,15 @@ const extendedProjects =
     swallowClickUntil = performance.now() + 400;
   }
   document.addEventListener('click', (e) => {
-    if (performance.now() < swallowClickUntil) {
-      e.stopPropagation();
-      e.preventDefault();
-      swallowClickUntil = 0;
-    }
+    if (performance.now() >= swallowClickUntil) return;
+    // Never eat clicks on the overlay's own controls — only the opening ghost
+    // click that would otherwise hit the nav zones. Swallowing the Exit button
+    // is exactly the intermittent "can't close" bug we must avoid.
+    const t = e.target as Node;
+    if (overlayCloseBtn?.contains(t) || muxControls?.contains(t)) return;
+    e.stopPropagation();
+    e.preventDefault();
+    swallowClickUntil = 0;
   }, true);
 
   function currentRealIndex(): number {
@@ -2616,15 +2620,27 @@ const extendedProjects =
 
   slider.addEventListener('wheel', onWheel, { passive: false });
 
-  // ── Resize ───────────────────────────────────────────────────────────────
+  // ── Resize / relayout ──────────────────────────────────────────────────────
+  // Re-measure slide heights and snap back to the current slide. Used for window
+  // resizes *and* — crucially — for the late layout/viewport settle on mobile
+  // (e.g. the browser address bar collapsing after first paint), which otherwise
+  // leaves init()'s one-shot measurement wrong and the images visibly off-centre
+  // until a refresh or navigation. A ResizeObserver catches that settle reliably.
+  function relayout(): void {
+    sizeSlides();
+    if (!isDragging && !animating) goToVirtual(currentVirtualIndex, false);
+  }
+
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
   window.addEventListener('resize', () => {
     if (resizeTimer !== null) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      sizeSlides();
-      goToVirtual(currentVirtualIndex, false);
-    }, 100);
+    resizeTimer = setTimeout(relayout, 100);
   });
+
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(() => relayout());
+    ro.observe(slider);
+  }
 
   // ── Init ─────────────────────────────────────────────────────────────────
   // Sanity returns projects in descending index order, so projects[0] is the
@@ -3071,7 +3087,17 @@ const extendedProjects =
     });
   }
 
-  overlayCloseBtn.addEventListener('click', (e) => { e.preventDefault(); closeMobileOverlay(); });
+  // Close on touchend directly rather than relying on the synthesised click:
+  // the overlay's touchmove calls preventDefault on tiny horizontal jitter,
+  // which suppresses the click on iOS, and the ghost-click window could swallow
+  // it. stopPropagation keeps the overlay's own tap handler from also firing.
+  function requestOverlayClose(e: Event): void {
+    e.preventDefault();
+    e.stopPropagation();
+    closeMobileOverlay();
+  }
+  overlayCloseBtn.addEventListener('click', requestOverlayClose);
+  overlayCloseBtn.addEventListener('touchend', requestOverlayClose, { passive: false });
 
   document.addEventListener('keydown', (e) => {
     if (!overlayOpen) return;

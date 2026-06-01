@@ -219,6 +219,14 @@ const FONTS: CssVariable[] = ["--font-sans"];
             let overlayOpen    = false;
             let footerVisible  = false;
             let labelTl: gsap.core.Timeline | null = null;
+            let mobileInfoSlideActive = false;
+
+            // On mobile, project 00 (the info slide) shows no nav label at all.
+            window.addEventListener('mobile-info-slide', (e: any) => {
+                if (window.innerWidth >= 768) return;
+                mobileInfoSlideActive = e.detail.active;
+                if (!overlayOpen) swapLabel(mobileInfoSlideActive ? 'none' : 'info');
+            });
 
             // Initial states
             gsap.set(panel,            { opacity: 0 });
@@ -226,8 +234,8 @@ const FONTS: CssVariable[] = ["--font-sans"];
             gsap.set(navInfoScrollTop, { yPercent: 110 });
 
             // Slide in the requested label, slide everything else out.
-            // state: 'info' | 'close' | 'scroll-top'
-            function swapLabel(state: 'info' | 'close' | 'scroll-top') {
+            // state: 'info' | 'close' | 'scroll-top' | 'none' (none = all hidden)
+            function swapLabel(state: 'info' | 'close' | 'scroll-top' | 'none') {
                 if (labelTl) labelTl.kill();
                 labelTl = gsap.timeline();
                 const targets = [
@@ -289,6 +297,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
                     }
                 } else {
                     if (overlayOpen) closeInfo();
+                    else if (mobileInfoSlideActive) { /* project 00: no label, do nothing */ }
                     else openInfo();
                 }
             });
