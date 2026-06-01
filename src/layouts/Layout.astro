@@ -138,8 +138,11 @@ const FONTS: CssVariable[] = ["--font-sans"];
                                 style="aspect-ratio: 5/7;"
                             />
                         </div>
-                        <!-- matches #center-info: absolute top-1/2 left-0 right-0 -->
-                        <div class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-start text-white mix-blend-difference uppercase tracking-custom text-sm font-normal pointer-events-none">
+                        <!-- matches #center-info: absolute top-1/2 left-0 right-0.
+                             No hardcoded pointer-events here: links inherit the
+                             #info-overlay container's state (none when closed,
+                             auto when open) so they only respond while open. -->
+                        <div class="absolute top-1/2 left-0 right-0 flex flex-row justify-between items-start text-white mix-blend-difference uppercase tracking-custom text-sm font-normal">
                             <div class="leading-[110%] w-[75%]">
                                 <span style="display:block">Director and Photographer from Toronto.</span>
                                 <a href="mailto:info@justinabernethy.com" style="display:block;opacity:0.5">info@justinabernethy.com</a>

@@ -2505,9 +2505,16 @@ const extendedProjects =
     const dt = performance.now() - startTime;
 
     if (maybeTap(dy, dx, dt)) {
+      const realIdx = currentRealIndex();
+      if (projects[realIdx]?._id === '__info__') {
+        // On the info slide: let the tap fall through to the project-00 links.
+        // Snap any tiny drag back without touching pointer-events so the click lands.
+        gsap.to(track, { y: translateYForVirtual(currentVirtualIndex), duration: 0.3, ease: SLIDE_EASE });
+        return;
+      }
       goToVirtual(currentVirtualIndex);
       swallowNextClick();
-      openMobileOverlay(currentRealIndex());
+      openMobileOverlay(realIdx);
       return;
     }
 
@@ -2552,9 +2559,15 @@ const extendedProjects =
     const dt = performance.now() - startTime;
 
     if (maybeTap(dy, dx, dt)) {
+      const realIdx = currentRealIndex();
+      if (projects[realIdx]?._id === '__info__') {
+        // On the info slide: let the tap fall through to the project-00 links.
+        gsap.to(track, { y: translateYForVirtual(currentVirtualIndex), duration: 0.3, ease: SLIDE_EASE });
+        return;
+      }
       goToVirtual(currentVirtualIndex);
       swallowNextClick();
-      openMobileOverlay(currentRealIndex());
+      openMobileOverlay(realIdx);
       return;
     }
 
