@@ -395,7 +395,7 @@ const extendedProjects =
                   alt={project.name ?? ''}
                   class="w-full object-cover block"
                   style="aspect-ratio: 5/7;"
-                  loading={i <= 2 ? 'eager' : 'lazy'}
+                  loading="eager"
                   draggable="false"
                 />
               ) : project.muxID ? (
@@ -2470,9 +2470,14 @@ const extendedProjects =
     else                           goToVirtual(currentVirtualIndex);
   }
 
-  slider.addEventListener('touchstart', onTouchStart, { passive: true });
-  slider.addEventListener('touchmove',  onTouchMove,  { passive: false });
-  slider.addEventListener('touchend',   onTouchEnd,   { passive: true });
+  slider.addEventListener('touchstart',  onTouchStart,  { passive: true });
+  slider.addEventListener('touchmove',   onTouchMove,   { passive: false });
+  slider.addEventListener('touchend',    onTouchEnd,    { passive: true });
+  slider.addEventListener('touchcancel', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    goToVirtual(currentVirtualIndex);
+  }, { passive: true });
 
   // ── Pointer events (desktop testing) ─────────────────────────────────────
   function onPointerDown(e: PointerEvent): void {
@@ -2623,6 +2628,8 @@ const extendedProjects =
     paused:   boolean;
     currentTime: number;
     duration:    number;
+    videoWidth:  number;
+    videoHeight: number;
     requestFullscreen?: () => Promise<void>;
   };
 
@@ -2803,6 +2810,44 @@ const extendedProjects =
   let overlayItems: OverlayMedia[] = [];
   let overlayVirtual = 1; // virtual index into extended track (1 = first real item)
 
+  // Force the inner <video> non-interactive. The host's pointer-events:none
+  // *should* inherit, but iOS Safari lets a playing inline <video> swallow taps
+  // over its rect regardless — which steals taps meant for the Exit button when
+  // the player box overlaps it. Set pointer-events:none directly on the media.
+  function hardenOverlayVideo(player: MobileMuxPlayer): void {
+    customElements.whenDefined('mux-player').then(() => {
+      let tries = 0;
+      const apply = () => {
+        const muxVideo = (player as any).media as (HTMLElement & { media?: HTMLElement }) | null;
+        if (muxVideo) {
+          muxVideo.style.pointerEvents = 'none';
+          const nativeVideo = muxVideo.media;
+          if (nativeVideo) nativeVideo.style.pointerEvents = 'none';
+        } else if (tries++ < 20) {
+          requestAnimationFrame(apply);
+        }
+      };
+      apply();
+    });
+  }
+
+  // Shrink the player box to hug the actual video frame. Without this a portrait
+  // video keeps width:100% and clamps to max-height:100%, so the host balloons to
+  // fill the whole overlay and covers the Exit button at the top-left. Using the
+  // video's own aspect ratio keeps the box the size of the visible frame, which
+  // also keeps the floating mux controls positioned against the real video.
+  function fitOverlayPlayer(player: MobileMuxPlayer): void {
+    const vw = player.videoWidth  || 0;
+    const vh = player.videoHeight || 0;
+    if (!vw || !vh) return;
+    player.style.setProperty('aspect-ratio', `${vw} / ${vh}`);
+    player.style.width     = 'auto';
+    player.style.height    = '100%';
+    player.style.maxWidth  = '100%';
+    player.style.maxHeight = '100%';
+    if (activeMuxPlayer === player) positionMuxControls();
+  }
+
   function buildOverlayItems(project: any): OverlayMedia[] {
     const items: OverlayMedia[] = [];
     if (project.muxID && !project.thumbnailUrl) {
@@ -2843,7 +2888,15 @@ const extendedProjects =
         player.style.width = '100%';
         player.style.maxHeight = '100%';
         player.style.pointerEvents = 'none';
+        // Prevent the mux-player shadow DOM from capturing touches on iOS Safari,
+        // which would swallow taps intended for the close button and nav controls.
+        slide.style.pointerEvents = 'none';
         slide.appendChild(player);
+        // Neutralise the inner <video> (iOS tap interception) and shrink the box
+        // to the video frame so it never overlaps the Exit button.
+        hardenOverlayVideo(player);
+        fitOverlayPlayer(player);
+        player.addEventListener('loadedmetadata', () => fitOverlayPlayer(player));
       } else {
         const img = document.createElement('img');
         img.src = item.url;
