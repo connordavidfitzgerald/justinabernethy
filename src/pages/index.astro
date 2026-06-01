@@ -2720,6 +2720,7 @@ const extendedProjects =
   const muxThumbEl      = muxControls?.querySelector('[data-mux-ctl="thumb"]')      as HTMLElement | null;
 
   let activeMuxPlayer: MobileMuxPlayer | null = null;
+  let muxResizeObserver: ResizeObserver | null = null;
   const muxListeners: { [k: string]: (e?: any) => void } = {};
 
   function fmtTime(s: number): string {
@@ -2784,6 +2785,12 @@ const extendedProjects =
     syncMuxUI();
     positionMuxControls();
     window.addEventListener('resize', positionMuxControls);
+    // Reposition when the player's box changes — e.g. a 4:3 video settling into
+    // its real aspect ratio after metadata loads, which a one-shot position misses.
+    if (typeof ResizeObserver !== 'undefined') {
+      muxResizeObserver = new ResizeObserver(() => positionMuxControls());
+      muxResizeObserver.observe(player);
+    }
 
     if (muxControls) {
       muxControls.style.opacity    = '1';
@@ -2799,6 +2806,7 @@ const extendedProjects =
     }
     activeMuxPlayer = null;
     window.removeEventListener('resize', positionMuxControls);
+    if (muxResizeObserver) { muxResizeObserver.disconnect(); muxResizeObserver = null; }
     if (muxControls) {
       muxControls.style.opacity    = '0';
       muxControls.style.visibility = 'hidden';
