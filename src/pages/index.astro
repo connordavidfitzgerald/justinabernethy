@@ -455,7 +455,7 @@ const extendedProjects =
 
       <button
         id="mobile-overlay-close"
-        class="absolute top-12 left-2 z-50 uppercase tracking-custom text-sm font-normal opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none p-3 -m-3"
+        class="absolute top-12 left-2 z-100 uppercase tracking-custom text-sm font-normal opacity-100 cursor-pointer bg-transparent appearance-none border-0 outline-none p-5 -m-5"
       >Exit</button>
 
       <div
@@ -2374,6 +2374,22 @@ const extendedProjects =
     );
   }
 
+  // A tap that opens the overlay is followed by a synthesised "ghost" click at
+  // the same point ~300ms later. Once the overlay is on top, that click would
+  // land on its nav zones (jumping a slide) or, after a close, fall through to
+  // the slider/info links behind. Swallow the first click in a short window.
+  let swallowClickUntil = 0;
+  function swallowNextClick(): void {
+    swallowClickUntil = performance.now() + 400;
+  }
+  document.addEventListener('click', (e) => {
+    if (performance.now() < swallowClickUntil) {
+      e.stopPropagation();
+      e.preventDefault();
+      swallowClickUntil = 0;
+    }
+  }, true);
+
   function currentRealIndex(): number {
     const vi = currentVirtualIndex;
     return vi === 0 ? n - 1 : vi === n + 1 ? 0 : vi - 1;
@@ -2396,8 +2412,8 @@ const extendedProjects =
     if (project._id === '__info__') {
       centerNameEl.innerHTML =
         '<span style="display:block">Director and Photographer from Toronto.</span>' +
-        '<a href="mailto:info@justinabernethy.com" style="display:block;opacity:0.5;pointer-events:auto">info@justinabernethy.com</a>' +
-        '<span style="display:flex;gap:2.5rem;padding-top:4rem;"><a href="https://www.instagram.com/nethyj/" style="pointer-events:auto">Instagram</a><a href="https://vimeo.com/user96868841" style="pointer-events:auto">Vimeo</a></span>';
+        '<a href="mailto:info@justinabernethy.com" style="display:block;opacity:0.5">info@justinabernethy.com</a>' +
+        '<span style="display:flex;gap:2.5rem;padding-top:4rem;"><a href="https://www.instagram.com/nethyj/">Instagram</a><a href="https://vimeo.com/user96868841">Vimeo</a></span>';
       centerIndexEl.textContent = '000';
       window.dispatchEvent(new CustomEvent('mobile-info-slide', { detail: { active: true } }));
       return;
@@ -2407,10 +2423,46 @@ const extendedProjects =
     window.dispatchEvent(new CustomEvent('mobile-info-slide', { detail: { active: false } }));
   }
 
+  // The project-00 (info) slide is the only one with real links, shown in the
+  // fixed center-info band. Keep those links clickable *only* when we are
+  // actually settled on the info slide — otherwise a tap or ghost click landing
+  // on the center band would "click through" to project 00's links. The links
+  // themselves carry no pointer-events, so toggling the container governs them.
+  function refreshInfoInteractivity(): void {
+    const onInfo = projects[currentRealIndex()]?._id === '__info__';
+    centerInfo.style.pointerEvents = onInfo ? 'auto' : 'none';
+  }
+
+  // Seamless-loop normalisation. The track has a clone of the last slide before
+  // the first (virtual index 0) and a clone of the first after the last (index
+  // n+1). When we land on a clone, shift the index by one full loop (±n) and the
+  // track position by ∓n·height at the same time: since slide i and slide i+n
+  // show identical content, this is pixel-for-pixel invisible while bringing the
+  // index back into the real [1..n] range. Running this both on settle *and* at
+  // the start of every new gesture means an interrupted wrap can never strand
+  // the index on a clone — which previously let a quick second swipe step out of
+  // range (e.g. 0 → -1) onto a blank slide with no way to recover.
+  function normalizeLoop(): void {
+    if (n === 0) return;
+    const h = slider.offsetHeight;
+    if (currentVirtualIndex <= 0) {
+      currentVirtualIndex += n;
+      currentTranslateY = (gsap.getProperty(track, 'y') as number) - n * h;
+      gsap.set(track, { y: currentTranslateY });
+    } else if (currentVirtualIndex >= n + 1) {
+      currentVirtualIndex -= n;
+      currentTranslateY = (gsap.getProperty(track, 'y') as number) + n * h;
+      gsap.set(track, { y: currentTranslateY });
+    }
+  }
+
   function goToVirtual(vi: number, animate = true): void {
     if (n === 0) return;
     const targetY = translateYForVirtual(vi);
     updateInfoText(vi);
+    // Disable info links while moving; re-enabled only once settled on the info
+    // slide via refreshInfoInteractivity below.
+    centerInfo.style.pointerEvents = 'none';
 
     if (animate) {
       animating = true;
@@ -2422,27 +2474,29 @@ const extendedProjects =
         onComplete() {
           animating         = false;
           currentTranslateY = targetY;
-          if (vi === 0)     goToVirtual(n, false);
-          if (vi === n + 1) goToVirtual(1, false);
+          normalizeLoop();
+          refreshInfoInteractivity();
         },
       });
     } else {
       gsap.set(track, { y: targetY });
       currentTranslateY   = targetY;
       currentVirtualIndex = vi;
+      refreshInfoInteractivity();
     }
   }
 
   // ── Touch events ─────────────────────────────────────────────────────────
   function onTouchStart(e: TouchEvent): void {
     if (n === 0) return;
+    gsap.killTweensOf(track);
+    animating = false;
+    normalizeLoop();              // recover the index if a previous wrap was interrupted
     startY          = e.touches[0].clientY;
     startX          = e.touches[0].clientX;
     startTime       = performance.now();
     startTranslateY = gsap.getProperty(track, 'y') as number;
     isDragging      = true;
-    gsap.killTweensOf(track);
-    animating = false;
   }
 
   function onTouchMove(e: TouchEvent): void {
@@ -2461,6 +2515,7 @@ const extendedProjects =
 
     if (maybeTap(dy, dx, dt)) {
       goToVirtual(currentVirtualIndex);
+      swallowNextClick();
       openMobileOverlay(currentRealIndex());
       return;
     }
@@ -2482,14 +2537,15 @@ const extendedProjects =
   // ── Pointer events (desktop testing) ─────────────────────────────────────
   function onPointerDown(e: PointerEvent): void {
     if (e.pointerType !== 'mouse' || n === 0) return;
+    gsap.killTweensOf(track);
+    animating = false;
+    normalizeLoop();              // recover the index if a previous wrap was interrupted
     startY          = e.clientY;
     startX          = e.clientX;
     startTime       = performance.now();
     startTranslateY = gsap.getProperty(track, 'y') as number;
     isDragging      = true;
     slider.setPointerCapture(e.pointerId);
-    gsap.killTweensOf(track);
-    animating = false;
   }
 
   function onPointerMove(e: PointerEvent): void {
@@ -2506,6 +2562,7 @@ const extendedProjects =
 
     if (maybeTap(dy, dx, dt)) {
       goToVirtual(currentVirtualIndex);
+      swallowNextClick();
       openMobileOverlay(currentRealIndex());
       return;
     }
@@ -2982,6 +3039,7 @@ const extendedProjects =
 
     overlayOpen = true;
     overlayEl.style.pointerEvents = 'auto';
+    centerInfo.style.pointerEvents = 'none'; // belt-and-suspenders: never let the band behind catch taps
 
     gsap.to(overlayEl, { opacity: 1, duration: 0.5, ease: 'power3.out' });
     gsap.fromTo(
@@ -2996,6 +3054,7 @@ const extendedProjects =
     overlayOpen = false;
     history.replaceState(null, '', location.pathname + location.search);
     detachMuxControls();
+    refreshInfoInteractivity(); // restore info-link state for the slide we return to
 
     gsap.to(overlayEl, {
       opacity: 0,
