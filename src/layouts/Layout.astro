@@ -219,13 +219,6 @@ const FONTS: CssVariable[] = ["--font-sans"];
             let overlayOpen    = false;
             let footerVisible  = false;
             let labelTl: gsap.core.Timeline | null = null;
-            let mobileInfoSlideActive = false;
-
-            window.addEventListener('mobile-info-slide', (e: any) => {
-                if (window.innerWidth >= 768) return;
-                mobileInfoSlideActive = e.detail.active;
-                if (!overlayOpen) swapLabel(mobileInfoSlideActive ? 'close' : 'info');
-            });
 
             // Initial states
             gsap.set(panel,            { opacity: 0 });
@@ -296,7 +289,6 @@ const FONTS: CssVariable[] = ["--font-sans"];
                     }
                 } else {
                     if (overlayOpen) closeInfo();
-                    else if (mobileInfoSlideActive) (window as any).__mobileGoNextSlide?.();
                     else openInfo();
                 }
             });
