@@ -30,6 +30,10 @@ const FONTS: CssVariable[] = ["--font-sans"];
         <meta property="og:type" content="website" />
         <link rel="preconnect" href="https://cdn.sanity.io" crossorigin />
         <link rel="dns-prefetch" href="https://cdn.sanity.io" />
+        <link rel="preconnect" href="https://stream.mux.com" crossorigin />
+        <link rel="dns-prefetch" href="https://stream.mux.com" />
+        <link rel="preconnect" href="https://image.mux.com" crossorigin />
+        <link rel="dns-prefetch" href="https://image.mux.com" />
         {preloadImages.map((url) => <link rel="preload" as="image" href={url} />)}
         {FONTS.map((font) => <Font cssVariable={font} preload />)}
         <title>{title}</title>
@@ -60,7 +64,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 </div>
                 <div style="overflow: hidden; position: relative;">
                     <a id="nav-info" class="block">
-                        <span id="nav-info-label" style="display: block;">Information</span>
+                        <span id="nav-info-label" class="cursor-pointer" style="display: block;">Information</span>
                     </a>
                     <span id="nav-info-close" class="cursor-pointer" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap; visibility: hidden;">Close</span>
                     <span id="nav-info-scroll-top" class="cursor-pointer" style="display: block; position: absolute; top: 0; right: 0; white-space: nowrap; visibility: hidden;">Back to top</span>
@@ -284,7 +288,7 @@ const FONTS: CssVariable[] = ["--font-sans"];
                 });
             }
 
-            
+
             navInfo.addEventListener('click', (e: MouseEvent) => {
                 e.preventDefault();
                 if (window.innerWidth >= 768) {

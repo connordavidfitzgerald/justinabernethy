@@ -1290,40 +1290,76 @@ const extendedProjects =
     });
   }
 
-  // Mux hover-play: inject player lazily on first hover, fade thumb ↔ video
+  // Mux hover-play with hover-intent prewarming.
+  // Players are injected lazily (nothing loads at page load), but buffering starts
+  // when the cursor enters the *row* — a beat before it reaches an item — so the
+  // video is ready to play the instant you hover it.
+  const itemWarmers = new Map<HTMLElement, () => void>();
+
   for (const item of allItems) {
     const muxWrapper = item.querySelector<HTMLElement>('[data-mux-id]');
     if (!muxWrapper) continue;
     const muxId = muxWrapper.dataset.muxId!;
 
-    item.addEventListener('mouseenter', () => {
-      const thumb = muxWrapper.querySelector<HTMLElement>('.mux-thumb');
-      let player = muxWrapper.querySelector<any>('mux-player');
+    // Track live hover state so a deferred play only fires if the cursor is still
+    // over the item by the time the media is ready.
+    let hovering = false;
 
+    // A freshly-created <mux-player> can't play() on the same tick it's appended
+    // (it would silently no-op until a second hover), so the first play is deferred
+    // to `loadedmetadata`. This guard runs that play only when actually hovered.
+    const tryPlay = (player: any) => {
+      if (hovering) player.play().catch(() => {});
+    };
+
+    // Inject the player and start buffering (preload), but don't play yet.
+    const warm = () => {
+      let player = muxWrapper.querySelector<any>('mux-player');
       if (!player) {
         player = document.createElement('mux-player') as any;
         player.setAttribute('playback-id', muxId);
         player.setAttribute('muted', '');
         player.setAttribute('loop', '');
-        player.setAttribute('preload', 'none');
+        player.setAttribute('preload', 'auto');
         player.setAttribute('plays-inline', '');
         player.setAttribute('disable-tracking', '');
         player.style.cssText =
           'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;--controls:none;opacity:0;transition:opacity 0.3s;';
+        // Play as soon as the media is ready, if the cursor has landed by then.
+        player.addEventListener('loadedmetadata', () => tryPlay(player), { once: true });
         muxWrapper.appendChild(player);
       }
+      return player;
+    };
+    itemWarmers.set(item, warm);
 
-      player.play().catch(() => {});
+    item.addEventListener('mouseenter', () => {
+      hovering = true;
+      const thumb = muxWrapper.querySelector<HTMLElement>('.mux-thumb');
+      const player = warm();   // usually already buffering from the row prewarm
+      tryPlay(player);         // instant if loaded; else loadedmetadata covers it
       player.style.opacity = '1';
       if (thumb) thumb.style.opacity = '0';
     });
 
     item.addEventListener('mouseleave', () => {
+      hovering = false;
       const thumb = muxWrapper.querySelector<HTMLElement>('.mux-thumb');
       const player = muxWrapper.querySelector<any>('mux-player');
       if (player) { player.pause(); player.style.opacity = '0'; }
       if (thumb) thumb.style.opacity = '1';
     });
+  }
+
+  // Hover-intent prewarm: the first time the cursor enters a row, start buffering
+  // every video in it so play is instant once the cursor reaches an item. Runs
+  // once per row — the injected players persist and are reused on later hovers.
+  for (const row of allRows) {
+    row.addEventListener('mouseenter', () => {
+      for (const rowItem of row.querySelectorAll<HTMLElement>('.gallery-item')) {
+        itemWarmers.get(rowItem)?.();
+      }
+    }, { once: true });
   }
 
   // Sidebar list click handlers (use cached node list)
@@ -2257,14 +2293,6 @@ const extendedProjects =
             gsap.to(footer, { opacity: 1, duration: 0.4, ease: 'power2.out' });
           }
         }
-      }
-
-      // Hover-driven video play/pause
-      for (const item of allItems) {
-        const video = item.querySelector('mux-player') as (HTMLVideoElement & { play: () => void; pause: () => void }) | null;
-        if (!video) continue;
-        item.addEventListener('mouseenter', () => video.play());
-        item.addEventListener('mouseleave', () => video.pause());
       }
     } catch (e) {
       console.error('Error initializing gallery:', e);
