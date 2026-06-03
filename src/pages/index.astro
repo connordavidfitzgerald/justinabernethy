@@ -81,15 +81,26 @@ const projectsWithUrls = projects.map((project: any, i: number) => {
   // Ordered, typed gallery — images and videos preserved in author order.
   // 1400px covers fullscreen overlay (portrait ~700px, landscape up to ~1400px)
   const galleryItems = (project.imageGallery ?? [])
-    .map((item: any) =>
-      item?._type === 'mux.video'
-        ? (item.asset?.playbackId
-            ? { type: 'video', playbackId: item.asset.playbackId, _key: item._key }
-            : null)
-        : (item?.asset
-            ? { type: 'image', url: urlForImage(item).width(1400).quality(80).auto('format').url(), _key: item._key }
-            : null)
-    )
+    .map((item: any) => {
+      if (item?._type === 'mux.video') {
+        return item.asset?.playbackId
+          ? { type: 'video', playbackId: item.asset.playbackId, _key: item._key }
+          : null;
+      }
+      if (!item?.asset) return null;
+      // Landscape/widescreen images (16:9 ≈ 1.78, 2:1 = 2, 3:2 = 1.5, 4:3 ≈ 1.33) span
+      // both columns on the project page; portrait/square stay in a single column.
+      const aspectRatio = item.asset?.metadata?.dimensions?.aspectRatio ?? null;
+      const wide = aspectRatio != null && aspectRatio >= 1.3;
+      return {
+        type: 'image',
+        // Wide images render at full grid width, so request a larger source.
+        url: urlForImage(item).width(wide ? 1800 : 1400).quality(80).auto('format').url(),
+        aspectRatio,
+        wide,
+        _key: item._key,
+      };
+    })
     .filter(Boolean);
 
   // Grid / mobile-slide poster, with a fallback chain so every project renders even
@@ -830,6 +841,18 @@ const extendedProjects =
               src="https://image.mux.com/${m.playbackId}/thumbnail.jpg?width=1400&fit_mode=smartcrop"
               alt="${project.name}"
               class="w-full h-full object-cover"
+            />
+            <div class="gallery-image-cover absolute -inset-1 bg-theme z-10 pointer-events-none"></div>
+          `;
+        } else if (m.wide) {
+          // Widescreen image: span both columns, keep its natural ratio (no crop).
+          slot.className = 'detail-gallery-slot col-span-2 w-full overflow-hidden relative';
+          slot.innerHTML = `
+            <img
+              src="${m.url}"
+              alt="${project.name}"
+              class="w-full h-full object-cover"
+              style="aspect-ratio: ${m.aspectRatio}"
             />
             <div class="gallery-image-cover absolute -inset-1 bg-theme z-10 pointer-events-none"></div>
           `;
