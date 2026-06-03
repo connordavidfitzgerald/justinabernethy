@@ -12,11 +12,10 @@ import { urlForImage } from '../sanity/lib/url-for-image.ts';
 import { sanityClient } from 'sanity:client';
 import headshot from "../assets/images/JAFINALHEADSHOT.jpg"
 
-const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
+const PROJECTS_QUERY = `*[_type == "project"] | order(orderRank) {
  _id,
   name,
   type,
-  index,
   thumbnail {
       ...,
       asset-> {
@@ -68,7 +67,10 @@ function nameToSlug(name: string): string {
 }
 
 // Pre-compute all image URLs for client-side use
-const projectsWithUrls = projects.map((project: any) => {
+const projectsWithUrls = projects.map((project: any, i: number) => {
+  // Display number is derived from drag order (Sanity orderRank), not a stored field.
+  // Projects come back ascending, so the first project is 001.
+  const displayIndex = String(i + 1).padStart(3, '0');
   // 900px covers gallery grid, sidebar preview, mobile (2× retina ~430px → 860px)
   const thumbnailUrl = project.thumbnail?.asset
     ? urlForImage(project.thumbnail).width(900).quality(80).auto('format').url()
@@ -106,6 +108,7 @@ const projectsWithUrls = projects.map((project: any) => {
   return {
     ...project,
     slug: project.name ? nameToSlug(project.name) : project._id,
+    displayIndex,
     thumbnailUrl,
     thumbnailVideoId,
     galleryItems,
@@ -119,11 +122,9 @@ const rows = Array.from({ length: Math.ceil(projectsWithUrls.length / ROW_SIZE) 
   projectsWithUrls.slice(i * ROW_SIZE, i * ROW_SIZE + ROW_SIZE)
 );
 
-// Thumbnails sorted ascending by index for the preloader.
+// Thumbnails in display order (001 first) for the preloader.
 // Use small images (300px wide, q=60) — the preloader image is only 104×130px.
 const preloaderThumbnails = projectsWithUrls
-    .slice()
-    .sort((a: any, b: any) => a.index - b.index)
     .map((p: any) => p.thumbnail?.asset
         ? urlForImage(p.thumbnail).width(300).quality(60).auto('format').url()
         : null)
@@ -142,7 +143,7 @@ const infoSlide = {
   _id: '__info__',
   name: null,
   type: null,
-  index: 0,
+  displayIndex: '000',
   thumbnailUrl: headshot.src,
   thumbnailVideoId: null,
   posterUrl: headshot.src,
@@ -254,7 +255,7 @@ const extendedProjects =
                         <div class="title-fade-overlay absolute inset-0 h-full w-full z-1 pointer-events-none opacity-100 gradient-fade"></div>
                         <div class="flex flex-col gap-0 items-end grow z-2">
                           <div style="overflow: hidden; line-height: 1;">
-                            <p class="text-sm leading-[100%] tracking-custom flex" data-index-reveal>{project.index}</p>
+                            <p class="text-sm leading-[100%] tracking-custom flex" data-index-reveal>{project.displayIndex}</p>
                           </div>
                         </div>
                       </div>
@@ -316,7 +317,7 @@ const extendedProjects =
                         class="detail-list-item flex flex-row gap-padding cursor-pointer opacity-muted"
                         data-project-id={project._id}
                       >
-                        <p class="min-w-4.5">{String(project.index).padStart(3, '0')}</p>
+                        <p class="min-w-4.5">{project.displayIndex}</p>
                         <p>{project.name}</p>
                       </div>
                     ))}
@@ -550,7 +551,7 @@ const extendedProjects =
     _id: '__info__',
     name: null,
     type: null,
-    index: 0,
+    displayIndex: '000',
     thumbnailUrl: headshotSrc,
     thumbnailVideoId: null,
     posterUrl: headshotSrc,
@@ -2525,7 +2526,7 @@ const extendedProjects =
       return;
     }
     centerNameEl.textContent  = project.name ?? '';
-    centerIndexEl.textContent = String(project.index ?? '').padStart(3, '0');
+    centerIndexEl.textContent = project.displayIndex ?? '';
     window.dispatchEvent(new CustomEvent('mobile-info-slide', { detail: { active: false } }));
   }
 
@@ -3221,7 +3222,7 @@ const extendedProjects =
     if (overlayItems.length === 0) return;
 
     overlayNameEl.textContent  = project.name ?? '';
-    overlayIndexEl.textContent = String(project.index ?? '').padStart(3, '0');
+    overlayIndexEl.textContent = project.displayIndex ?? '';
     if (project.slug) history.replaceState(null, '', '#' + project.slug);
 
     overlayEl.classList.remove('hidden');
