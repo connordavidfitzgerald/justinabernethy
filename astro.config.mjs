@@ -10,8 +10,19 @@ import svelte from "@astrojs/svelte";
 
 import react from "@astrojs/react";
 
+import vercel from "@astrojs/vercel";
+
 // https://astro.build/config
 export default defineConfig({
+  // Deploy to Vercel. Pages marked `prerender = false` (currently the homepage)
+  // render on-demand and are cached via ISR, so publishing in Sanity shows up
+  // within `expiration` seconds without a full rebuild.
+  adapter: vercel({
+    isr: {
+      expiration: 60, // re-fetch Sanity data at most once per 60s
+    },
+  }),
+
   vite: {
     plugins: [tailwindcss()],
   },
@@ -50,8 +61,8 @@ export default defineConfig({
     sanity({
       projectId: "t3fe0x9u",
       dataset: "production",
-      // Set useCdn to false if you're building statically.
-      useCdn: true,
+      // ISR re-renders on a timer, so pull fresh (uncached) data each time.
+      useCdn: false,
       apiVersion: "2026-04-01",
     }),
     svelte(),
