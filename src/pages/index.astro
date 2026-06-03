@@ -24,32 +24,33 @@ const PROJECTS_QUERY = `*[_type == "project"] | order(index desc) {
         }
       }
     },
+  thumbnailVideo {
+      asset-> {
+        "playbackId": coalesce(playbackId, data.playback_ids[0].id)
+      }
+    },
   imageGallery[] {
       _key,
+      _type,
       asset-> {
         _id,
         url,
+        "playbackId": coalesce(playbackId, data.playback_ids[0].id),
         metadata {
           dimensions,
           lqip
         }
       }
     },
-  muxID,
 }`;
 
 const { data: projects } = await loadQuery({ query: PROJECTS_QUERY });
 
 const ROW_SIZE = 5;
 
-// Chunk into rows of ROW_SIZE
-const rows = Array.from({ length: Math.ceil(projects.length / ROW_SIZE) }, (_, i) =>
-  projects.slice(i * ROW_SIZE, i * ROW_SIZE + ROW_SIZE)
-);
-
 // aspect is h/w — portrait 2/3 = 1.5, landscape 16/9 ≈ 0.5625
-function getAspect(project: (typeof projects)[number]): number {
-  return project.muxID && !project.thumbnail?.asset ? 9 / 16 : 7 / 5;
+function getAspect(project: { posterVideoId?: string | null }): number {
+  return project.posterVideoId ? 9 / 16 : 7 / 5;
 }
 
 function nameToSlug(name: string): string {
@@ -63,19 +64,56 @@ function nameToSlug(name: string): string {
 }
 
 // Pre-compute all image URLs for client-side use
-const projectsWithUrls = projects.map(project => ({
-  ...project,
-  slug: project.name ? nameToSlug(project.name) : project._id,
+const projectsWithUrls = projects.map((project: any) => {
   // 900px covers gallery grid, sidebar preview, mobile (2× retina ~430px → 860px)
-  thumbnailUrl: project.thumbnail?.asset
+  const thumbnailUrl = project.thumbnail?.asset
     ? urlForImage(project.thumbnail).width(900).quality(80).auto('format').url()
-    : null,
+    : null;
+  // Mux playback id for the thumbnail video (drives the grid/sidebar video display)
+  const thumbnailVideoId = project.thumbnailVideo?.asset?.playbackId ?? null;
+
+  // Ordered, typed gallery — images and videos preserved in author order.
   // 1400px covers fullscreen overlay (portrait ~700px, landscape up to ~1400px)
-  galleryUrls: project.imageGallery?.filter((img: any) => img?.asset).map((img: any) => ({
-    url: urlForImage(img).width(1400).quality(80).auto('format').url(),
-    _key: img._key
-  })) || []
-}));
+  const galleryItems = (project.imageGallery ?? [])
+    .map((item: any) =>
+      item?._type === 'mux.video'
+        ? (item.asset?.playbackId
+            ? { type: 'video', playbackId: item.asset.playbackId, _key: item._key }
+            : null)
+        : (item?.asset
+            ? { type: 'image', url: urlForImage(item).width(1400).quality(80).auto('format').url(), _key: item._key }
+            : null)
+    )
+    .filter(Boolean);
+
+  // Grid / mobile-slide poster, with a fallback chain so every project renders even
+  // when it has no thumbnail and no thumbnailVideo: thumbnail video → still image →
+  // first gallery video → first gallery image. `posterVideoId` (when set) makes the
+  // grid render a 16/9 Mux poster and drives the hover-to-play warmer.
+  const firstGalleryVideo = galleryItems.find((g: any) => g.type === 'video');
+  const firstGalleryImage = galleryItems.find((g: any) => g.type === 'image');
+  let posterVideoId: string | null = null;
+  let posterUrl: string | null = null;
+  if (thumbnailVideoId) posterVideoId = thumbnailVideoId;
+  else if (thumbnailUrl) posterUrl = thumbnailUrl;
+  else if (firstGalleryVideo) posterVideoId = firstGalleryVideo.playbackId;
+  else if (firstGalleryImage) posterUrl = firstGalleryImage.url;
+
+  return {
+    ...project,
+    slug: project.name ? nameToSlug(project.name) : project._id,
+    thumbnailUrl,
+    thumbnailVideoId,
+    galleryItems,
+    posterVideoId,
+    posterUrl,
+  };
+});
+
+// Chunk into rows of ROW_SIZE (over the enriched projects so markup can read derived fields)
+const rows = Array.from({ length: Math.ceil(projectsWithUrls.length / ROW_SIZE) }, (_, i) =>
+  projectsWithUrls.slice(i * ROW_SIZE, i * ROW_SIZE + ROW_SIZE)
+);
 
 // Thumbnails sorted ascending by index for the preloader.
 // Use small images (300px wide, q=60) — the preloader image is only 104×130px.
@@ -102,7 +140,10 @@ const infoSlide = {
   type: null,
   index: 0,
   thumbnailUrl: headshot.src,
-  galleryUrls: [] as { url: string; _key: string }[],
+  thumbnailVideoId: null,
+  posterUrl: headshot.src,
+  posterVideoId: null,
+  galleryItems: [] as { type: string; url?: string; playbackId?: string; _key: string }[],
 };
 
 const allSlides = [...projectsWithUrls, infoSlide];
@@ -167,15 +208,15 @@ const extendedProjects =
                       {/* Cover overlay for animation */}
                       <div class="gallery-item-cover absolute -inset-1 bg-theme z-10 pointer-events-none" style="transform: translateY(100%)"></div>
 
-                      {project.muxID && !project.thumbnail?.asset ? (
+                      {project.posterVideoId ? (
                         <div
                           class="item-media relative w-full overflow-hidden"
                           style="aspect-ratio: 16/9"
                           data-flip-id={`media-${project._id}`}
-                          data-mux-id={project.muxID}
+                          data-mux-id={project.posterVideoId}
                         >
                           <img
-                            src={`https://image.mux.com/${project.muxID}/thumbnail.jpg?width=900&fit_mode=smartcrop`}
+                            src={`https://image.mux.com/${project.posterVideoId}/thumbnail.jpg?width=900&fit_mode=smartcrop`}
                             alt={project.name ?? ''}
                             class="mux-thumb absolute inset-0 w-full h-full object-cover"
                             style="transition: opacity 0.3s;"
@@ -183,15 +224,21 @@ const extendedProjects =
                             fetchpriority={rowIndex === 0 ? 'high' : undefined}
                           />
                         </div>
-                      ) : (
+                      ) : project.posterUrl ? (
                         <img
-                          src={urlForImage(project.thumbnail).width(900).quality(80).auto('format').url()}
+                          src={project.posterUrl}
                           alt={project.name}
                           class="item-media w-full object-cover"
                           style="aspect-ratio: 5/7"
                           data-flip-id={`media-${project._id}`}
                           loading={rowIndex === 0 ? 'eager' : 'lazy'}
                           fetchpriority={rowIndex === 0 ? 'high' : undefined}
+                        />
+                      ) : (
+                        <div
+                          class="item-media w-full bg-theme"
+                          style="aspect-ratio: 5/7"
+                          data-flip-id={`media-${project._id}`}
                         />
                       )}
                       <div id="item-name-type" class="item-name-type flex flex-row justify-between w-full relative overflow-clip font-normal tracking-custom -mt-0 pb-padding">
@@ -233,18 +280,18 @@ const extendedProjects =
                           class="preview-item opacity-0 col-start-1 row-start-1 flex items-end"
                           data-preview-id={project._id}
                         >
-                          {project.muxID && !project.thumbnailUrl ? (
+                          {project.posterVideoId ? (
                             <MuxPlayer
-                              playbackId={project.muxID}
+                              playbackId={project.posterVideoId}
                               class="w-full object-cover aspect-video"
                               style={{ '--controls': 'none' }}
                               muted
                               loop
                               disable-tracking
                             />
-                          ) : project.thumbnailUrl ? (
+                          ) : project.posterUrl ? (
                             <img
-                              src={project.thumbnailUrl}
+                              src={project.posterUrl}
                               alt={project.name}
                               class="w-full object-cover"
                               style="aspect-ratio: 4/5"
@@ -354,7 +401,7 @@ const extendedProjects =
             <div class="h-full max-w-full aspect-5/7 overflow-hidden" style="max-height: calc(100% - (0.375rem*6));">
                 <Picture
                     src={headshot}
-                    alt="Justin Abernethy headshot"\
+                    alt="Justin Abernethy headshot"
                     class="w-full h-full object-cover"
                 />
             </div>
@@ -389,25 +436,25 @@ const extendedProjects =
               data-real-index={realIndex}
               data-virtual-index={i}
             >
-              {project.thumbnailUrl ? (
-                <img
-                  src={project.thumbnailUrl}
-                  alt={project.name ?? ''}
-                  class="w-full object-cover block"
-                  style="aspect-ratio: 5/7;"
-                  loading="eager"
-                  draggable="false"
-                />
-              ) : project.muxID ? (
+              {project.posterVideoId ? (
                 <div class="w-full flex items-center justify-center" style="aspect-ratio: 5/7;">
                   <img
-                    src={`https://image.mux.com/${project.muxID}/thumbnail.jpg?width=900&fit_mode=smartcrop`}
+                    src={`https://image.mux.com/${project.posterVideoId}/thumbnail.jpg?width=900&fit_mode=smartcrop`}
                     alt={project.name ?? ''}
                     class="w-full object-cover block"
                     style="aspect-ratio: 16/9;"
                     draggable="false"
                   />
                 </div>
+              ) : project.posterUrl ? (
+                <img
+                  src={project.posterUrl}
+                  alt={project.name ?? ''}
+                  class="w-full object-cover block"
+                  style="aspect-ratio: 5/7;"
+                  loading="eager"
+                  draggable="false"
+                />
               ) : (
                 <div
                   class="w-full bg-gray-800 block"
@@ -501,7 +548,10 @@ const extendedProjects =
     type: null,
     index: 0,
     thumbnailUrl: headshotSrc,
-    galleryUrls: [],
+    thumbnailVideoId: null,
+    posterUrl: headshotSrc,
+    posterVideoId: null,
+    galleryItems: [],
   }];
 </script>
 
@@ -682,20 +732,51 @@ const extendedProjects =
     return projectsData.find(p => p._id === id);
   }
 
+  // Ordered media for a project: [hero, ...rest].
+  // For a video project (thumbnailVideoId set) the hero is the FIRST gallery video,
+  // which is then excluded from the rest. If there is no gallery video, the hero
+  // falls back to the thumbnail video. Image projects use the thumbnail image as hero.
+  function getProjectMedia(project: any): any[] {
+    const gallery: any[] = project.galleryItems ?? [];
+    const out: any[] = [];
+
+    if (project.thumbnailVideoId) {
+      const vIdx = gallery.findIndex((g) => g.type === 'video');
+      if (vIdx >= 0) {
+        out.push({ ...gallery[vIdx], alt: project.name });
+        gallery.forEach((g, i) => { if (i !== vIdx) out.push({ ...g, alt: project.name }); });
+      } else {
+        out.push({ type: 'video', playbackId: project.thumbnailVideoId, alt: project.name, _key: 'thumbnail' });
+        gallery.forEach((g) => out.push({ ...g, alt: project.name }));
+      }
+    } else {
+      if (project.thumbnailUrl) {
+        out.push({ type: 'image', url: project.thumbnailUrl, alt: project.name, _key: 'thumbnail' });
+      }
+      gallery.forEach((g) => out.push({ ...g, alt: project.name }));
+    }
+
+    return out;
+  }
+
   function populateProjectDetail(project: any, { instant = false } = {}) {
     // Clear existing gallery and detach any active video controls
     detachMuxControls();
     detailImageGallery!.innerHTML = '';
 
-    // Build first slot
+    // Ordered media — slot 0 is the hero (flip target), the rest fill the grid.
+    const media = getProjectMedia(project);
+    const hero = media[0];
+
+    // Build hero slot
     const firstSlot = document.createElement('div');
     firstSlot.id = 'detail-first-image';
 
-    if (project.muxID && !project.thumbnailUrl) {
-      firstSlot.className = 'col-span-2 w-full h-auto aspect-video';
+    if (hero && hero.type === 'video') {
+      firstSlot.className = 'detail-gallery-slot col-span-2 w-full h-auto aspect-video';
       firstSlot.innerHTML = `
         <mux-player
-          playback-id="${project.muxID}"
+          playback-id="${hero.playbackId}"
           class="w-full object-cover h-full"
           style="--controls: none"
           muted
@@ -705,11 +786,11 @@ const extendedProjects =
           data-flip-id="media-${project._id}"
         ></mux-player>
       `;
-    } else if (project.thumbnailUrl) {
-      firstSlot.className = 'col-span-1 w-full overflow-hidden';
+    } else if (hero && hero.type === 'image') {
+      firstSlot.className = 'detail-gallery-slot col-span-1 w-full overflow-hidden';
       firstSlot.innerHTML = `
         <img
-          src="${project.thumbnailUrl}"
+          src="${hero.url}"
           alt="${project.name}"
           class="w-full h-full object-cover"
           style="aspect-ratio: 5/7"
@@ -719,7 +800,7 @@ const extendedProjects =
     }
     detailImageGallery!.appendChild(firstSlot);
 
-    if (project.muxID && !project.thumbnailUrl) {
+    if (hero && hero.type === 'video') {
       customElements.whenDefined('mux-player').then(() => {
         const attach = () => {
           const player = firstSlot.querySelector('mux-player') as MuxPlayer | null;
@@ -730,21 +811,35 @@ const extendedProjects =
       });
     }
 
-    // Batch-append gallery slots via DocumentFragment (single reflow)
-    if (project.galleryUrls && project.galleryUrls.length > 0) {
+    // Batch-append remaining gallery slots via DocumentFragment (single reflow).
+    // Gallery videos render as a Mux poster image that opens the overlay on click.
+    const rest = media.slice(1);
+    if (rest.length > 0) {
       const fragment = document.createDocumentFragment();
-      for (const img of project.galleryUrls) {
+      for (const m of rest) {
         const slot = document.createElement('div');
-        slot.className = 'col-span-1 w-full overflow-hidden relative';
-        slot.innerHTML = `
-          <img
-            src="${img.url}"
-            alt="${project.name}"
-            class="w-full h-full object-cover"
-            style="aspect-ratio: 5/7"
-          />
-          <div class="gallery-image-cover absolute -inset-1 bg-theme z-10 pointer-events-none"></div>
-        `;
+        if (m.type === 'video') {
+          slot.className = 'detail-gallery-slot col-span-2 w-full overflow-hidden relative aspect-video';
+          slot.innerHTML = `
+            <img
+              src="https://image.mux.com/${m.playbackId}/thumbnail.jpg?width=1400&fit_mode=smartcrop"
+              alt="${project.name}"
+              class="w-full h-full object-cover"
+            />
+            <div class="gallery-image-cover absolute -inset-1 bg-theme z-10 pointer-events-none"></div>
+          `;
+        } else {
+          slot.className = 'detail-gallery-slot col-span-1 w-full overflow-hidden relative';
+          slot.innerHTML = `
+            <img
+              src="${m.url}"
+              alt="${project.name}"
+              class="w-full h-full object-cover"
+              style="aspect-ratio: 5/7"
+            />
+            <div class="gallery-image-cover absolute -inset-1 bg-theme z-10 pointer-events-none"></div>
+          `;
+        }
         fragment.appendChild(slot);
       }
       detailImageGallery!.appendChild(fragment);
@@ -937,7 +1032,7 @@ const extendedProjects =
 
         // Reveal gallery images
         const galleryCovers = detailImageGallery!.querySelectorAll('.gallery-image-cover');
-        const gallerySlots  = detailImageGallery!.querySelectorAll<HTMLElement>('[id="detail-first-image"], .col-span-1.w-full.overflow-hidden');
+        const gallerySlots  = detailImageGallery!.querySelectorAll<HTMLElement>('.detail-gallery-slot');
         gallerySlots.forEach(s => { s.style.pointerEvents = 'none'; });
         gsap.fromTo(galleryCovers,
           { y: 0 },
@@ -1825,21 +1920,8 @@ const extendedProjects =
   const overlayNext = document.getElementById('overlay-next');
 
   function buildMediaItems(project: any): any[] {
-    const items: any[] = [];
-
-    if (project.muxID && !project.thumbnailUrl) {
-      items.push({ type: 'video', playbackId: project.muxID, alt: project.name, _key: 'thumbnail' });
-    } else if (project.thumbnailUrl) {
-      items.push({ type: 'image', url: project.thumbnailUrl, alt: project.name, _key: 'thumbnail' });
-    }
-
-    if (project.galleryUrls?.length) {
-      for (const img of project.galleryUrls) {
-        items.push({ type: 'image', url: img.url, alt: project.name, _key: img._key });
-      }
-    }
-
-    return items;
+    // Same ordered list the detail grid renders, so slot index === overlay index.
+    return getProjectMedia(project);
   }
 
   // ─── Custom mux-player controls (single-view overlay) ───────────────────
@@ -2210,7 +2292,7 @@ const extendedProjects =
     detailGalleryListenerAttached = true;
 
     detailImageGallery.addEventListener('click', (e) => {
-      const slot = (e.target as HTMLElement).closest('#detail-first-image, .col-span-1.w-full.overflow-hidden');
+      const slot = (e.target as HTMLElement).closest('.detail-gallery-slot');
       if (!slot) return;
 
       e.preventDefault();
@@ -2225,11 +2307,8 @@ const extendedProjects =
       const project = getProjectById(projectId);
       if (!project) return;
 
-      let clickedIndex = 0;
-      if (slot.id !== 'detail-first-image') {
-        const slots = [...detailImageGallery.querySelectorAll('#detail-first-image, .col-span-1.w-full.overflow-hidden')];
-        clickedIndex = Math.max(0, slots.indexOf(slot));
-      }
+      const slots = [...detailImageGallery.querySelectorAll('.detail-gallery-slot')];
+      const clickedIndex = Math.max(0, slots.indexOf(slot));
 
       openOverlay(projectId, clickedIndex);
     });
@@ -2960,19 +3039,43 @@ const extendedProjects =
     if (activeMuxPlayer === player) positionMuxControls();
   }
 
-  function buildOverlayItems(project: any): OverlayMedia[] {
-    const items: OverlayMedia[] = [];
-    if (project.muxID && !project.thumbnailUrl) {
-      items.push({ type: 'video', playbackId: project.muxID, alt: project.name ?? '' });
-    } else if (project.thumbnailUrl) {
-      items.push({ type: 'image', url: project.thumbnailUrl, alt: project.name ?? '' });
-    }
-    if (Array.isArray(project.galleryUrls)) {
-      for (const img of project.galleryUrls) {
-        items.push({ type: 'image', url: img.url, alt: project.name ?? '' });
+  // Ordered media for a project: [hero, ...rest]. For a video project the hero is
+  // the first gallery video (excluded from the rest); with no gallery video it falls
+  // back to the thumbnail video. Image projects use the thumbnail image as hero.
+  function getProjectMedia(project: any): OverlayMedia[] {
+    const gallery: any[] = project.galleryItems ?? [];
+    const out: OverlayMedia[] = [];
+    const alt = project.name ?? '';
+
+    if (project.thumbnailVideoId) {
+      const vIdx = gallery.findIndex((g) => g.type === 'video');
+      if (vIdx >= 0) {
+        out.push({ type: 'video', playbackId: gallery[vIdx].playbackId, alt });
+        gallery.forEach((g, i) => {
+          if (i === vIdx) return;
+          if (g.type === 'video') out.push({ type: 'video', playbackId: g.playbackId, alt });
+          else out.push({ type: 'image', url: g.url, alt });
+        });
+      } else {
+        out.push({ type: 'video', playbackId: project.thumbnailVideoId, alt });
+        gallery.forEach((g) => {
+          if (g.type === 'video') out.push({ type: 'video', playbackId: g.playbackId, alt });
+          else out.push({ type: 'image', url: g.url, alt });
+        });
       }
+    } else {
+      if (project.thumbnailUrl) out.push({ type: 'image', url: project.thumbnailUrl, alt });
+      gallery.forEach((g) => {
+        if (g.type === 'video') out.push({ type: 'video', playbackId: g.playbackId, alt });
+        else out.push({ type: 'image', url: g.url, alt });
+      });
     }
-    return items;
+
+    return out;
+  }
+
+  function buildOverlayItems(project: any): OverlayMedia[] {
+    return getProjectMedia(project);
   }
 
   function buildOverlayTrack(): void {
