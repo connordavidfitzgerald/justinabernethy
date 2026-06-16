@@ -29,7 +29,8 @@ const PROJECTS_QUERY = `*[_type == "project"] | order(orderRank) {
     },
   thumbnailVideo {
       asset-> {
-        "playbackId": coalesce(playbackId, data.playback_ids[0].id)
+        "playbackId": coalesce(playbackId, data.playback_ids[0].id),
+        "aspectRatio": data.aspect_ratio
       }
     },
   imageGallery[] {
@@ -39,6 +40,7 @@ const PROJECTS_QUERY = `*[_type == "project"] | order(orderRank) {
         _id,
         url,
         "playbackId": coalesce(playbackId, data.playback_ids[0].id),
+        "aspectRatio": data.aspect_ratio,
         metadata {
           dimensions,
           lqip
@@ -51,9 +53,23 @@ const { data: projects } = await loadQuery({ query: PROJECTS_QUERY });
 
 const ROW_SIZE = 5;
 
-// aspect is h/w — portrait 2/3 = 1.5, landscape 16/9 ≈ 0.5625
-function getAspect(project: { posterVideoId?: string | null }): number {
-  return project.posterVideoId ? 9 / 16 : 7 / 5;
+// Fallback for videos whose Mux asset doesn't report an aspect ratio.
+const DEFAULT_VIDEO_ASPECT = 16 / 9;
+
+// Mux reports aspect ratio as a "W:H" string (e.g. "16:9", "1080:1920").
+// Parse to a numeric width/height ratio; null when unavailable.
+function parseMuxAspect(raw?: string | null): number | null {
+  if (!raw) return null;
+  const [w, h] = String(raw).split(':').map(Number);
+  return w && h ? w / h : null;
+}
+
+// aspect is h/w — portrait 7/5 = 1.4, landscape 16/9 ≈ 0.5625.
+// Video projects use the poster video's true ratio so the grid row sizing
+// matches the media (no forced 16:9); image projects keep the 7/5 portrait ratio.
+function getAspect(project: { posterVideoId?: string | null; posterVideoAspect?: number | null }): number {
+  if (project.posterVideoId) return 1 / (project.posterVideoAspect ?? DEFAULT_VIDEO_ASPECT);
+  return 7 / 5;
 }
 
 function nameToSlug(name: string): string {
@@ -66,17 +82,43 @@ function nameToSlug(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+// Portfolio quality target. Slightly higher than a generic web default since the
+// client is a photographer; AVIF/WebP (via auto('format')) keeps the bytes down.
+const IMG_QUALITY = 83;
+
+// Build a responsive Sanity source: a 1× URL at `w` plus a 2× srcset for retina
+// (capped at 2× DPR). Sanity resizes/compresses on its CDN and normalises colour
+// to sRGB, so upload full-res sRGB masters and let this do the rest — no pre-squooshing.
+function sanitySrc(source: any, w: number): { src: string; srcset: string } {
+  const at = (width: number) =>
+    urlForImage(source).width(width).quality(IMG_QUALITY).auto('format').url();
+  const src = at(w);
+  return { src, srcset: `${src} 1x, ${at(w * 2)} 2x` };
+}
+
+// Mux poster still: 1×/2× srcset so video thumbnails stay sharp on retina too.
+function muxPosterSrcset(playbackId: string, w = 900): string {
+  const at = (width: number) => `https://image.mux.com/${playbackId}/thumbnail.jpg?width=${width}`;
+  return `${at(w)} 1x, ${at(w * 2)} 2x`;
+}
+
 // Pre-compute all image URLs for client-side use
 const projectsWithUrls = projects.map((project: any, i: number) => {
   // Display number is derived from drag order (Sanity orderRank), not a stored field.
   // Projects come back ascending, so the first project is 001.
   const displayIndex = String(i + 1).padStart(3, '0');
-  // 900px covers gallery grid, sidebar preview, mobile (2× retina ~430px → 860px)
-  const thumbnailUrl = project.thumbnail?.asset
-    ? urlForImage(project.thumbnail).width(900).quality(80).auto('format').url()
-    : null;
+  // Grid tile / sidebar / mobile poster — 900px 1×, with a 2× srcset for retina.
+  const thumb = project.thumbnail?.asset ? sanitySrc(project.thumbnail, 900) : null;
+  const thumbnailUrl = thumb?.src ?? null;
+  const thumbnailSrcset = thumb?.srcset ?? null;
+  // The project-detail hero renders far larger than the grid tile, so it needs a
+  // bigger source than the 900px thumbnail (this was a real softness source).
+  const thumbDetail = project.thumbnail?.asset ? sanitySrc(project.thumbnail, 1400) : null;
+  const thumbnailDetailUrl = thumbDetail?.src ?? null;
+  const thumbnailDetailSrcset = thumbDetail?.srcset ?? null;
   // Mux playback id for the thumbnail video (drives the grid/sidebar video display)
   const thumbnailVideoId = project.thumbnailVideo?.asset?.playbackId ?? null;
+  const thumbnailVideoAspect = parseMuxAspect(project.thumbnailVideo?.asset?.aspectRatio);
 
   // Ordered, typed gallery — images and videos preserved in author order.
   // 1400px covers fullscreen overlay (portrait ~700px, landscape up to ~1400px)
@@ -84,7 +126,7 @@ const projectsWithUrls = projects.map((project: any, i: number) => {
     .map((item: any) => {
       if (item?._type === 'mux.video') {
         return item.asset?.playbackId
-          ? { type: 'video', playbackId: item.asset.playbackId, _key: item._key }
+          ? { type: 'video', playbackId: item.asset.playbackId, aspectRatio: parseMuxAspect(item.asset.aspectRatio), _key: item._key }
           : null;
       }
       if (!item?.asset) return null;
@@ -92,10 +134,12 @@ const projectsWithUrls = projects.map((project: any, i: number) => {
       // both columns on the project page; portrait/square stay in a single column.
       const aspectRatio = item.asset?.metadata?.dimensions?.aspectRatio ?? null;
       const wide = aspectRatio != null && aspectRatio >= 1.3;
+      // Wide images render at full grid width, so request a larger source.
+      const src = sanitySrc(item, wide ? 1800 : 1400);
       return {
         type: 'image',
-        // Wide images render at full grid width, so request a larger source.
-        url: urlForImage(item).width(wide ? 1800 : 1400).quality(80).auto('format').url(),
+        url: src.src,
+        srcset: src.srcset,
         aspectRatio,
         wide,
         _key: item._key,
@@ -110,21 +154,31 @@ const projectsWithUrls = projects.map((project: any, i: number) => {
   const firstGalleryVideo = galleryItems.find((g: any) => g.type === 'video');
   const firstGalleryImage = galleryItems.find((g: any) => g.type === 'image');
   let posterVideoId: string | null = null;
+  let posterVideoAspect: number | null = null;
   let posterUrl: string | null = null;
-  if (thumbnailVideoId) posterVideoId = thumbnailVideoId;
-  else if (thumbnailUrl) posterUrl = thumbnailUrl;
-  else if (firstGalleryVideo) posterVideoId = firstGalleryVideo.playbackId;
-  else if (firstGalleryImage) posterUrl = firstGalleryImage.url;
+  let posterSrcset: string | null = null;
+  if (thumbnailVideoId) { posterVideoId = thumbnailVideoId; posterVideoAspect = thumbnailVideoAspect; }
+  else if (thumbnailUrl) { posterUrl = thumbnailUrl; posterSrcset = thumbnailSrcset; }
+  else if (firstGalleryVideo) { posterVideoId = firstGalleryVideo.playbackId; posterVideoAspect = firstGalleryVideo.aspectRatio ?? null; }
+  else if (firstGalleryImage) { posterUrl = firstGalleryImage.url; posterSrcset = firstGalleryImage.srcset; }
+  const posterVideoSrcset = posterVideoId ? muxPosterSrcset(posterVideoId, 900) : null;
 
   return {
     ...project,
     slug: project.name ? nameToSlug(project.name) : project._id,
     displayIndex,
     thumbnailUrl,
+    thumbnailSrcset,
+    thumbnailDetailUrl,
+    thumbnailDetailSrcset,
     thumbnailVideoId,
+    thumbnailVideoAspect,
     galleryItems,
     posterVideoId,
+    posterVideoAspect,
     posterUrl,
+    posterSrcset,
+    posterVideoSrcset,
   };
 });
 
@@ -156,9 +210,16 @@ const infoSlide = {
   type: null,
   displayIndex: '000',
   thumbnailUrl: headshot.src,
+  thumbnailSrcset: null,
+  thumbnailDetailUrl: headshot.src,
+  thumbnailDetailSrcset: null,
   thumbnailVideoId: null,
+  thumbnailVideoAspect: null,
   posterUrl: headshot.src,
+  posterSrcset: null,
   posterVideoId: null,
+  posterVideoAspect: null,
+  posterVideoSrcset: null,
   galleryItems: [] as { type: string; url?: string; playbackId?: string; _key: string }[],
 };
 
@@ -227,12 +288,13 @@ const extendedProjects =
                       {project.posterVideoId ? (
                         <div
                           class="item-media relative w-full overflow-hidden"
-                          style="aspect-ratio: 16/9"
+                          style={`aspect-ratio: ${project.posterVideoAspect ?? DEFAULT_VIDEO_ASPECT}`}
                           data-flip-id={`media-${project._id}`}
                           data-mux-id={project.posterVideoId}
                         >
                           <img
-                            src={`https://image.mux.com/${project.posterVideoId}/thumbnail.jpg?width=900&fit_mode=smartcrop`}
+                            src={`https://image.mux.com/${project.posterVideoId}/thumbnail.jpg?width=900`}
+                            srcset={project.posterVideoSrcset}
                             alt={project.name ?? ''}
                             class="mux-thumb absolute inset-0 w-full h-full object-cover"
                             style="transition: opacity 0.3s;"
@@ -243,6 +305,7 @@ const extendedProjects =
                       ) : project.posterUrl ? (
                         <img
                           src={project.posterUrl}
+                          srcset={project.posterSrcset}
                           alt={project.name}
                           class="item-media w-full object-cover"
                           style="aspect-ratio: 5/7"
@@ -299,8 +362,8 @@ const extendedProjects =
                           {project.posterVideoId ? (
                             <MuxPlayer
                               playbackId={project.posterVideoId}
-                              class="w-full object-cover aspect-video"
-                              style={{ '--controls': 'none' }}
+                              class="w-full h-auto"
+                              style={{ '--controls': 'none', aspectRatio: String(project.posterVideoAspect ?? DEFAULT_VIDEO_ASPECT) }}
                               muted
                               loop
                               disable-tracking
@@ -308,6 +371,7 @@ const extendedProjects =
                           ) : project.posterUrl ? (
                             <img
                               src={project.posterUrl}
+                              srcset={project.posterSrcset}
                               alt={project.name}
                               class="w-full object-cover"
                               style="aspect-ratio: 4/5"
@@ -453,18 +517,18 @@ const extendedProjects =
               data-virtual-index={i}
             >
               {project.posterVideoId ? (
-                <div class="w-full flex items-center justify-center" style="aspect-ratio: 5/7;">
-                  <img
-                    src={`https://image.mux.com/${project.posterVideoId}/thumbnail.jpg?width=900&fit_mode=smartcrop`}
-                    alt={project.name ?? ''}
-                    class="w-full object-cover block"
-                    style="aspect-ratio: 16/9;"
-                    draggable="false"
-                  />
-                </div>
+                <img
+                  src={`https://image.mux.com/${project.posterVideoId}/thumbnail.jpg?width=900`}
+                  srcset={project.posterVideoSrcset}
+                  alt={project.name ?? ''}
+                  class="w-full object-cover block"
+                  style={`aspect-ratio: ${project.posterVideoAspect ?? DEFAULT_VIDEO_ASPECT};`}
+                  draggable="false"
+                />
               ) : project.posterUrl ? (
                 <img
                   src={project.posterUrl}
+                  srcset={project.posterSrcset}
                   alt={project.name ?? ''}
                   class="w-full object-cover block"
                   style="aspect-ratio: 5/7;"
@@ -564,9 +628,16 @@ const extendedProjects =
     type: null,
     displayIndex: '000',
     thumbnailUrl: headshotSrc,
+    thumbnailSrcset: null,
+    thumbnailDetailUrl: headshotSrc,
+    thumbnailDetailSrcset: null,
     thumbnailVideoId: null,
+    thumbnailVideoAspect: null,
     posterUrl: headshotSrc,
+    posterSrcset: null,
     posterVideoId: null,
+    posterVideoAspect: null,
+    posterVideoSrcset: null,
     galleryItems: [],
   }];
 </script>
@@ -575,6 +646,9 @@ const extendedProjects =
   import gsap from 'gsap';
   import { SplitText } from 'gsap/SplitText';
   gsap.registerPlugin(SplitText);
+
+  // Fallback ratio for videos whose Mux asset doesn't report an aspect ratio.
+  const DEFAULT_VIDEO_ASPECT = 16 / 9;
 
   // Expose globals so the inline preloader script can use them
   (window as any).gsap = gsap;
@@ -762,17 +836,45 @@ const extendedProjects =
         out.push({ ...gallery[vIdx], alt: project.name });
         gallery.forEach((g, i) => { if (i !== vIdx) out.push({ ...g, alt: project.name }); });
       } else {
-        out.push({ type: 'video', playbackId: project.thumbnailVideoId, alt: project.name, _key: 'thumbnail' });
+        out.push({ type: 'video', playbackId: project.thumbnailVideoId, aspectRatio: project.thumbnailVideoAspect ?? null, alt: project.name, _key: 'thumbnail' });
         gallery.forEach((g) => out.push({ ...g, alt: project.name }));
       }
     } else {
-      if (project.thumbnailUrl) {
-        out.push({ type: 'image', url: project.thumbnailUrl, alt: project.name, _key: 'thumbnail' });
+      if (project.thumbnailDetailUrl) {
+        out.push({ type: 'image', url: project.thumbnailDetailUrl, srcset: project.thumbnailDetailSrcset, alt: project.name, _key: 'thumbnail' });
       }
       gallery.forEach((g) => out.push({ ...g, alt: project.name }));
     }
 
     return out;
+  }
+
+  // Auto-play inline gallery videos while they're in view; pause when scrolled away.
+  // Rebuilt each time the detail view is (re)populated.
+  let galleryVideoObserver: IntersectionObserver | null = null;
+
+  function setupGalleryVideoPlayback() {
+    galleryVideoObserver?.disconnect();
+    galleryVideoObserver = null;
+
+    const players = detailImageGallery!.querySelectorAll<MuxPlayer>('mux-player[data-gallery-video]');
+    if (players.length === 0) return;
+
+    galleryVideoObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const player = entry.target as MuxPlayer;
+        if (entry.isIntersecting) {
+          const playResult = player.play();
+          if (playResult && typeof (playResult as any).catch === 'function') {
+            (playResult as Promise<void>).catch(() => {}); // ignore autoplay rejections
+          }
+        } else {
+          player.pause();
+        }
+      }
+    }, { threshold: 0.25 });
+
+    players.forEach((p) => galleryVideoObserver!.observe(p));
   }
 
   function populateProjectDetail(project: any, { instant = false } = {}) {
@@ -789,7 +891,8 @@ const extendedProjects =
     firstSlot.id = 'detail-first-image';
 
     if (hero && hero.type === 'video') {
-      firstSlot.className = 'detail-gallery-slot col-span-2 w-full h-auto aspect-video';
+      firstSlot.className = 'detail-gallery-slot col-span-2 max-[1100px]:col-span-1 w-full h-auto';
+      firstSlot.style.aspectRatio = String(hero.aspectRatio ?? DEFAULT_VIDEO_ASPECT);
       firstSlot.innerHTML = `
         <mux-player
           playback-id="${hero.playbackId}"
@@ -807,6 +910,7 @@ const extendedProjects =
       firstSlot.innerHTML = `
         <img
           src="${hero.url}"
+          ${hero.srcset ? `srcset="${hero.srcset}"` : ''}
           alt="${project.name}"
           class="w-full h-full object-cover"
           style="aspect-ratio: 5/7"
@@ -835,21 +939,30 @@ const extendedProjects =
       for (const m of rest) {
         const slot = document.createElement('div');
         if (m.type === 'video') {
-          slot.className = 'detail-gallery-slot col-span-2 w-full overflow-hidden relative aspect-video';
+          slot.className = 'detail-gallery-slot col-span-2 max-[1100px]:col-span-1 w-full overflow-hidden relative';
+          slot.style.aspectRatio = String(m.aspectRatio ?? DEFAULT_VIDEO_ASPECT);
+          // Live player that auto-plays while in view (paused when scrolled away).
+          // pointer-events:none lets a click fall through to the slot → opens the overlay.
           slot.innerHTML = `
-            <img
-              src="https://image.mux.com/${m.playbackId}/thumbnail.jpg?width=1400&fit_mode=smartcrop"
-              alt="${project.name}"
+            <mux-player
+              playback-id="${m.playbackId}"
               class="w-full h-full object-cover"
-            />
+              style="--controls: none; pointer-events: none;"
+              muted
+              loop
+              playsinline
+              disable-tracking
+              data-gallery-video
+            ></mux-player>
             <div class="gallery-image-cover absolute -inset-1 bg-theme z-10 pointer-events-none"></div>
           `;
         } else if (m.wide) {
           // Widescreen image: span both columns, keep its natural ratio (no crop).
-          slot.className = 'detail-gallery-slot col-span-2 w-full overflow-hidden relative';
+          slot.className = 'detail-gallery-slot col-span-2 max-[1100px]:col-span-1 w-full overflow-hidden relative';
           slot.innerHTML = `
             <img
               src="${m.url}"
+              ${m.srcset ? `srcset="${m.srcset}"` : ''}
               alt="${project.name}"
               class="w-full h-full object-cover"
               style="aspect-ratio: ${m.aspectRatio}"
@@ -861,6 +974,7 @@ const extendedProjects =
           slot.innerHTML = `
             <img
               src="${m.url}"
+              ${m.srcset ? `srcset="${m.srcset}"` : ''}
               alt="${project.name}"
               class="w-full h-full object-cover"
               style="aspect-ratio: 5/7"
@@ -882,6 +996,9 @@ const extendedProjects =
 
     // Single attach call (was called twice; second was a no-op via guard)
     attachDetailGalleryListeners();
+
+    // Drive inline gallery-video play/pause from viewport visibility.
+    customElements.whenDefined('mux-player').then(() => setupGalleryVideoPlayback());
   }
 
   function openProject(projectId: string, clickedItem: HTMLElement) {
@@ -2120,6 +2237,7 @@ const extendedProjects =
     } else {
       const img = document.createElement('img');
       img.src = item.url;
+      if (item.srcset) img.srcset = item.srcset;
       img.alt = item.alt || '';
       img.className = 'w-auto h-full max-w-full max-h-screen object-contain';
       img.loading = 'eager';
@@ -2818,7 +2936,7 @@ const extendedProjects =
   // ─── Single-view overlay ──────────────────────────────────────────────────
   type OverlayMedia =
     | { type: 'video'; playbackId: string; alt: string }
-    | { type: 'image'; url: string;        alt: string };
+    | { type: 'image'; url: string; srcset?: string | null; alt: string };
 
   const overlayEl       = document.getElementById('mobile-overlay')           as HTMLElement;
   const overlayMediaEl  = document.getElementById('mobile-overlay-media')     as HTMLElement;
@@ -3082,17 +3200,17 @@ const extendedProjects =
         gallery.forEach((g, i) => {
           if (i === vIdx) return;
           if (g.type === 'video') out.push({ type: 'video', playbackId: g.playbackId, alt });
-          else out.push({ type: 'image', url: g.url, alt });
+          else out.push({ type: 'image', url: g.url, srcset: g.srcset, alt });
         });
       } else {
         out.push({ type: 'video', playbackId: project.thumbnailVideoId, alt });
         gallery.forEach((g) => {
           if (g.type === 'video') out.push({ type: 'video', playbackId: g.playbackId, alt });
-          else out.push({ type: 'image', url: g.url, alt });
+          else out.push({ type: 'image', url: g.url, srcset: g.srcset, alt });
         });
       }
     } else {
-      if (project.thumbnailUrl) out.push({ type: 'image', url: project.thumbnailUrl, alt });
+      if (project.thumbnailDetailUrl) out.push({ type: 'image', url: project.thumbnailDetailUrl, srcset: project.thumbnailDetailSrcset, alt });
       gallery.forEach((g) => {
         if (g.type === 'video') out.push({ type: 'video', playbackId: g.playbackId, alt });
         else out.push({ type: 'image', url: g.url, alt });
@@ -3148,6 +3266,7 @@ const extendedProjects =
       } else {
         const img = document.createElement('img');
         img.src = item.url;
+        if (item.srcset) img.srcset = item.srcset;
         img.alt = item.alt;
         img.draggable = false;
         img.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain; display: block;';
