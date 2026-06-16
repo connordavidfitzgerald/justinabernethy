@@ -769,7 +769,8 @@ const extendedProjects =
   // Track wrapper y values ourselves to avoid gsap.getProperty() in the hover loop
   const wrapperYValues = new Map<HTMLElement, number>();
 
-  // Per-row max-delta cache (only changes on resize)
+  // Per-row max-delta cache (only changes on resize). Worst-case magnification growth
+  // per row, used both to reserve container space and as the static hover push amount.
   let cachedMaxDeltas: number[] = [];
 
   // Document-relative natural top of each wrapper, captured in init() after the
@@ -1913,6 +1914,9 @@ const extendedProjects =
       animateItems(allRows[prevRowIndex], altWeightsBuffer);
     }
 
+    // Static push: reserve each row's worst-case magnification growth (precomputed,
+    // densely sampled across the cursor range) so the rows above clear it at any
+    // cursor position within the row.
     const activeDelta = cachedMaxDeltas[targetRowIndex] ?? 0;
     const belowDelta = hasNextRow ? (cachedMaxDeltas[nextRowIndex] ?? 0) * verticalFactor : 0;
     const aboveDelta = hasPrevRow ? (cachedMaxDeltas[prevRowIndex] ?? 0) * aboveVerticalFactor : 0;
@@ -1924,9 +1928,14 @@ const extendedProjects =
       let yPush = 0;
 
       if (i < targetRowIndex) {
-        yPush = -activeDelta;
+        // Rows above the hovered row must clear BOTH the hovered row's own
+        // magnification growth (activeDelta) AND the upward shift the hovered row
+        // itself takes to make room for the row below (belowDelta). Without the
+        // belowDelta term, hovering near a row's bottom edge rides that row up into
+        // the titles of the row above.
+        yPush = -activeDelta - belowDelta;
         if (i < prevRowIndex) {
-          yPush = -aboveDelta - activeDelta;
+          yPush = -aboveDelta - activeDelta - belowDelta;
         }
       } else if (i === targetRowIndex) {
         yPush = -belowDelta;
@@ -1966,8 +1975,13 @@ const extendedProjects =
     const available = width - (n - 1) * ITEM_GAP_PX;
     const baseH = calcBaseHeight(rowIndex);
 
-    const samplePositions: number[] = [0, n];
-    for (let j = 0; j < n; j++) samplePositions.push(j + 0.5);
+    // Sample the cursor across the whole row [0, n] at a fine resolution. Sampling
+    // only item centres misses the off-centre positions where the non-peak rescale
+    // cap engages and the hovered item magnifies *more* than at its centre — which
+    // under-computes the push and lets tall thumbnails ride over the titles above.
+    const samplePositions: number[] = [];
+    const SAMPLE_STEP = 0.05;
+    for (let pos = 0; pos <= n + 1e-9; pos += SAMPLE_STEP) samplePositions.push(pos);
 
     let maxDelta = 0;
     const tmpWeights: number[] = new Array(n);
